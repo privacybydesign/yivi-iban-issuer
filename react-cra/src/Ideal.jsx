@@ -1,11 +1,11 @@
-import React, {useEffect} from 'react';
-import {useLocation} from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   IdealBankElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import StatusMessages, {useMessages} from './StatusMessages';
+import StatusMessages, { useMessages } from './StatusMessages';
 
 const IdealForm = () => {
   const stripe = useStripe();
@@ -24,7 +24,7 @@ const IdealForm = () => {
       return;
     }
 
-    const {error: backendError, clientSecret} = await fetch(
+    const { error: backendError, clientSecret } = await fetch(
       '/api/create-payment-intent',
       {
         method: 'POST',
@@ -52,7 +52,6 @@ const IdealForm = () => {
       payment_method: {
         ideal: elements.getElement(IdealBankElement),
         billing_details: {
-          name: 'Jenny Rosen',
         },
       },
       return_url: `${window.location.origin}/ideal?return=true`,
@@ -74,14 +73,31 @@ const IdealForm = () => {
 
   return (
     <>
-      <h1>iDEAL</h1>
       <form id="payment-form" onSubmit={handleSubmit}>
-        <label htmlFor="ideal-bank-element">iDEAL Bank</label>
-        <IdealBankElement id="ideal-bank-element" />
+        <header><h1>Adding an IBAN</h1></header>
+        <main>
+          <div id="ideal-form">
+            <p>On this page you can add an IBAN to your Yivi app.</p>
+            <p>
+              Do you want to add multiple IBANs? Then perform these steps multiple times.
+            </p>
+            <label htmlFor="ideal-bank-element">iDEAL Bank</label>
+            <IdealBankElement id="ideal-bank-element" />
 
-        <button type="submit">Pay</button>
+            <label htmlFor="ideal-bank-element">Amount</label>
+            <p>€ 0,10</p>
+
+            <StatusMessages messages={messages} />
+          </div>
+        </main>
+        <footer>
+          <div className="actions">
+            <div></div>
+            <button id="submit-button" type="submit">Add IBAN</button>
+          </div>
+        </footer>
       </form>
-      <StatusMessages messages={messages} />
+
     </>
   );
 };

@@ -1,95 +1,218 @@
-@import url('https://fonts.googleapis.com/css?family=Raleway&display=swap');
-
-:root {
-  --light-grey: #F6F9FC;
-  --dark-terminal-color: #0A2540;
-  --accent-color: #635BFF;
-  --radius: 3px;
+@font-face {
+	font-family: 'Alexandria';
+	src: url('./fonts/alexandria-v1-latin-regular.woff2') format('woff2'),
+		url('./fonts/alexandria-v1-latin-regular.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
 }
 
+@font-face {
+	font-family: 'Alexandria';
+	src: url('./fonts/alexandria-v1-latin-600.woff2') format('woff2'),
+		url('./fonts/alexandria-v1-latin-600.woff') format('woff');
+	font-weight: bold;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('./fonts/open-sans-v34-latin-regular.woff2') format('woff2'),
+		url('./fonts/open-sans-v34-latin-regular.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	src: url('./fonts/open-sans-v34-latin-700.woff2') format('woff2'),
+		url('./fonts/open-sans-v34-latin-700.woff') format('woff');
+	font-weight: bold;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: 'IrmaIcons';
+	src: url('./fonts/irma-icons.ttf') format('truetype');
+	font-weight: bold;
+	font-style: normal;
+}
+
+html,
 body {
-  padding: 20px;
-  font-family: 'Raleway';
-  display: flex;
-  justify-content: center;
-  font-size: 1.2em;
-  color: var(--dark-terminal-color);
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	font-size: 16px;
+	line-height: 24px;
+	background-color: #F7F5F3;
+	font-family: 'Open Sans', Verdana, Arial, sans-serif;
+}
+
+form {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+header {
+	background: #FFFFFF;
+	color: #484747;
+	border-bottom: 1px solid #CFE4EF
+}
+
+header h1 {
+	text-align: center;
+	padding: 16px;
+}
+
+h1 {
+	display: block;
+	margin: 0;
+	font-size: 18px;
+	line-height: 22px;
+	padding: 16px 0;
+	font-weight: bold;
+	font-family: 'Alexandria', Verdana, Arial, sans-serif;
+}
+
+#ideal-form {
+	display: block;
+	padding: 16px;
+	color: #484747;
+	max-width: 600px;
+	margin: auto;
+}
+
+.alert {
+	max-width: 600px;
+	margin: 16px auto 16px auto;
+	padding: 20px;
+	color: #FFFFFF;
+	border-radius: 6px;
+}
+
+.status-container {
+	display: flex;
+	align-items: center;
+}
+
+.hidden {
+	display: none;
+}
+
+.button-hidden {
+	visibility: hidden;
+}
+
+.alert-info {
+	background-color: #96C5E1;
+}
+
+.alert-danger {
+	background-color: #C30025;
+}
+
+.alert-warning {
+	background-color: #CE5700;
+}
+
+.alert-success {
+	background-color: #00973A;
+}
+
+.alert-success .status-container:before {
+	font-family: 'IrmaIcons';
+	font-size: 24px;
+	font-style: normal;
+	line-height: initial;
+	vertical-align: middle;
+	content: '\E026';
+	margin-right: 16px;
 }
 
 main {
-  width: 480px;
-}
-
-form > * {
-  margin: 10px 0;
-}
-
-button {
-  background-color: var(--accent-color);
-}
-
-button {
-  background: var(--accent-color);
-  border-radius: var(--radius);
-  color: white;
-  border: 0;
-  padding: 12px 16px;
-  margin-top: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: block;
-}
-button:hover {
-  filter: contrast(115%);
-}
-button:active {
-  transform: translateY(0px) scale(0.98);
-  filter: brightness(0.9);
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: none;
-}
-
-input, select {
-  display: block;
-  font-size: 1.1em;
-  width: 100%;
+	flex: 1;
 }
 
 label {
-  display: block;
+	margin-top: 2rem;
+	margin-bottom: 0.5rem;
+	display: block;
+	color: #484747;
+	font-weight: bold;
 }
 
-a {
-  color: var(--accent-color);
-  font-weight: 900;
+input {
+	height: 32px;
+	display: block;
+	border: none;
+	border-bottom: 2px solid #484747;
+	width: 100%;
+	font-size: 16px;
+	line-height: 24px;
+	background-color: transparent;
 }
 
-small {
-  font-size: .6em;
+footer {
+	padding: 16px;
+	background: #FFFFFF;
+	box-shadow: 0px -4px 12px rgba(0, 0, 0, 0.1);
 }
 
-fieldset, input, select {
-  border: 1px solid #efefef;
+footer .actions {
+	max-width: 600px;
+	margin: auto;
+	display: flex;
+	justify-content: space-between;
 }
 
-
-#payment-form {
-  border: #F6F9FC solid 1px;
-  border-radius: var(--radius);
-  padding: 20px;
-  margin: 20px 0;
-  box-shadow: 0 30px 50px -20px rgb(50 50 93 / 25%), 0 30px 60px -30px rgb(0 0 0 / 30%);
+footer a,
+footer button {
+	font-family: 'Alexandria', Verdana, Arial, sans-serif;
+	display: inline-block;
+	text-align: center;
+	font-size: 16px;
+	font-weight: bold;
+	cursor: pointer;
+	border-radius: 6px;
+	box-sizing: border-box;
+	width: 48%;
+	height: 48px;
+	line-height: 48px;
+	max-width: 343px;
 }
 
-#messages {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New';
-  background-color: #0A253C;
-  color: #00D924;
-  padding: 20px;
-  margin: 20px 0;
-  border-radius: var(--radius);
-  font-size:0.7em;
+footer a {
+	background-color: #FFFFFF;
+	text-decoration: none;
+	color: #484747;
+	border: 1px solid #484747;
+}
+
+footer button {
+	border: none;
+	color: #FFFFFF;
+	background: #E12747 url('./images/button-primary.svg') no-repeat right top;
+}
+
+@media only screen and (max-width: 640px) {
+	.alert {
+		margin: 16px;
+	}
+}
+
+@media only screen and (max-width: 340px) {
+
+	html,
+	body,
+	footer a,
+	footer button,
+	input {
+		font-size: 14px;
+	}
+}
+
+#ideal-bank-element {
+	background-color: #FFFFFF;
+	padding: 1rem;
 }

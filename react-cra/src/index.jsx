@@ -8,9 +8,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const {publishableKey} = await fetch('/api/config').then((r) => r.json());
   const stripePromise = loadStripe(publishableKey);
 
+  const options = {
+    locale: 'en',
+  };
+
   ReactDOM.render(
     <React.StrictMode>
-      <Elements stripe={stripePromise}>
+      <Elements stripe={stripePromise} options={options}>
         <App />
       </Elements>
     </React.StrictMode>,
