@@ -1,4 +1,4 @@
-# Accept a payment examples in React for Payment Element
+# Accept a payment examples in React
 
 ## How to run locally
 

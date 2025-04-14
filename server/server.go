@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -34,7 +35,7 @@ func main() {
 
 	// For sample support and debugging, not required for production:
 	stripe.SetAppInfo(&stripe.AppInfo{
-		Name:    "stripe-samples/accept-a-payment/payment-element",
+		Name:    "stripe-samples/accept-a-payment/custom-payment-flow",
 		Version: "0.0.1",
 		URL:     "https://github.com/stripe-samples",
 	})
@@ -42,6 +43,8 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(os.Getenv("STATIC_DIR"))))
 	http.HandleFunc("/config", handleConfig)
 	http.HandleFunc("/create-payment-intent", handleCreatePaymentIntent)
+	http.HandleFunc("/success", handleSuccess)
+	http.HandleFunc("/payment/next", handlePaymentNext)
 	http.HandleFunc("/webhook", handleWebhook)
 
 	log.Println("server running at 0.0.0.0:4242")
@@ -72,11 +75,40 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type paymentIntentCreateReq struct {
+	Currency          string `json:"currency"`
+	PaymentMethodType string `json:"paymentMethodType"`
+}
+
 func handleCreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	req := paymentIntentCreateReq{}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	var formattedPaymentMethodType []*string
+
+	if req.PaymentMethodType == "link" {
+		formattedPaymentMethodType = append(formattedPaymentMethodType, stripe.String("link"), stripe.String("card"))
+	} else {
+		formattedPaymentMethodType = append(formattedPaymentMethodType, stripe.String(req.PaymentMethodType))
+	}
+
 	params := &stripe.PaymentIntentParams{
 		Amount:             stripe.Int64(amount),
-		Currency:           stripe.String("EUR"),
-		PaymentMethodTypes: stripe.StringSlice([]string{"ideal"}),
+		Currency:           stripe.String(req.Currency),
+		PaymentMethodTypes: formattedPaymentMethodType,
+	}
+
+	// If this is for an ACSS payment, we add payment_method_options to create
+	// the Mandate.
+	if req.PaymentMethodType == "acss_debit" {
+		params.PaymentMethodOptions = &stripe.PaymentIntentPaymentMethodOptionsParams{
+			ACSSDebit: &stripe.PaymentIntentPaymentMethodOptionsACSSDebitParams{
+				MandateOptions: &stripe.PaymentIntentPaymentMethodOptionsACSSDebitMandateOptionsParams{
+					PaymentSchedule: stripe.String("sporadic"),
+					TransactionType: stripe.String("personal"),
+				},
+			},
+		}
 	}
 
 	pi, err := paymentintent.New(params)
@@ -101,12 +133,38 @@ func handleCreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func handleSuccess(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	http.Redirect(w, r, "/success.html", http.StatusSeeOther)
+	return
+}
+
+func handlePaymentNext(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	payment_intent := r.URL.Query().Get("payment_intent")
+
+	pi, _ := paymentintent.Get(
+		payment_intent,
+		nil,
+	)
+
+	http.Redirect(w, r, fmt.Sprintf("/success?payment_intent_client_secret=%s", pi.ClientSecret), http.StatusSeeOther)
+	return
+}
+
 func handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	b, err := io.ReadAll(io.Reader(r.Body))
+	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		log.Printf("ioutil.ReadAll: %v", err)
@@ -144,6 +202,7 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func writeJSONError(w http.ResponseWriter, v interface{}, code int) {
 	w.WriteHeader(code)
 	writeJSON(w, v)
+	return
 }
 
 func writeJSONErrorMessage(w http.ResponseWriter, message string, code int) {

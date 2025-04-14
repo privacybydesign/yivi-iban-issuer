@@ -1,32 +1,21 @@
-import './App.css';
-import './Yivi.css'
-import Payment from './Payment'
-import Completion from './Completion'
-
-import {useEffect, useState} from 'react';
+import React from 'react';
 import {BrowserRouter, Routes, Route} from 'react-router-dom';
 
-import {loadStripe} from '@stripe/stripe-js';
+// Payment method components.
+import Ideal from './Ideal';
 
-function App() {
-  const [ stripePromise, setStripePromise ] = useState(null);
+import './App.css';
 
-  useEffect(() => {
-    fetch("/api/config").then(async (r) => {
-      const { publishableKey } = await r.json();
-      setStripePromise(loadStripe(publishableKey));
-    });
-  }, []);
-
+function App(props) {
   return (
-    <main>
+    <>
+      <a href="/">home</a>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Payment stripePromise={stripePromise} />} />
-          <Route path="/completion" element={<Completion stripePromise={stripePromise} />} />
+          <Route path="/" element={<Ideal />} />
         </Routes>
       </BrowserRouter>
-    </main>
+    </>
   );
 }
 

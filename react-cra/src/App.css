@@ -7,6 +7,19 @@
   --radius: 3px;
 }
 
+body {
+  padding: 20px;
+  font-family: 'Raleway';
+  display: flex;
+  justify-content: center;
+  font-size: 1.2em;
+  color: var(--dark-terminal-color);
+}
+
+main {
+  width: 480px;
+}
+
 form > * {
   margin: 10px 0;
 }
@@ -43,7 +56,6 @@ input, select {
   display: block;
   font-size: 1.1em;
   width: 100%;
-  margin-bottom: 10px;
 }
 
 label {
@@ -63,6 +75,7 @@ fieldset, input, select {
   border: 1px solid #efefef;
 }
 
+
 #payment-form {
   border: #F6F9FC solid 1px;
   border-radius: var(--radius);
@@ -73,7 +86,6 @@ fieldset, input, select {
 
 #messages {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New';
-  display: none; /* hide initially, then show once the first message arrives */
   background-color: #0A253C;
   color: #00D924;
   padding: 20px;
@@ -81,4 +93,3 @@ fieldset, input, select {
   border-radius: var(--radius);
   font-size:0.7em;
 }
-
