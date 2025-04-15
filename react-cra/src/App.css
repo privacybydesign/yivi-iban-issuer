@@ -48,7 +48,7 @@ body {
 	font-family: 'Open Sans', Verdana, Arial, sans-serif;
 }
 
-form {
+form, #container {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
@@ -215,4 +215,9 @@ footer button {
 #ideal-bank-element {
 	background-color: #FFFFFF;
 	padding: 1rem;
+}
+
+.details {
+	font-size: small;
+	font-style: italic;
 }

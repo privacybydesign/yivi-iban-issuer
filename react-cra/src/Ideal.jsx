@@ -1,148 +1,55 @@
-import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import {
-  IdealBankElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
-import StatusMessages, { useMessages } from './StatusMessages';
+import React from 'react';
 
 const IdealForm = () => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [messages, addMessage] = useMessages();
 
   const handleSubmit = async (e) => {
     // We don't want to let default form submission happen here,
     // which would refresh the page.
     e.preventDefault();
 
-    if (!stripe || !elements) {
-      // Stripe.js has not yet loaded.
-      // Make sure to disable form submission until Stripe.js has loaded.
-      addMessage('Stripe.js has not yet loaded.');
-      return;
-    }
-
-    const { error: backendError, clientSecret } = await fetch(
-      '/api/create-payment-intent',
+    // Call backend API to start iDEAL flow.
+    const response = await fetch(
+      '/api/ibancheck',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paymentMethodType: 'ideal',
-          currency: 'eur',
-        }),
+        }
       }
-    ).then((r) => r.json());
-
-    if (backendError) {
-      addMessage(backendError.message);
-      return;
-    }
-
-    addMessage('Client secret returned');
-
-    const {
-      error: stripeError,
-      paymentIntent,
-    } = await stripe.confirmIdealPayment(clientSecret, {
-      payment_method: {
-        ideal: elements.getElement(IdealBankElement),
-        billing_details: {
-        },
-      },
-      return_url: `${window.location.origin}/ideal?return=true`,
-    });
-
-    if (stripeError) {
-      // Show error to your customer (e.g., insufficient funds)
-      addMessage(stripeError.message);
-      return;
-    }
-
-    // Show a success message to your customer
-    // There's a risk of the customer closing the window before callback
-    // execution. Set up a webhook or plugin to listen for the
-    // payment_intent.succeeded event that handles any business critical
-    // post-payment actions.
-    addMessage(`Payment ${paymentIntent.status}: ${paymentIntent.id}`);
+    );
+    const data = await response.json()
+    window.location = data.issuer_authentication_url
   };
 
   return (
     <>
-      <form id="payment-form" onSubmit={handleSubmit}>
+      <form id="container" onSubmit={handleSubmit}>
         <header><h1>Adding an IBAN</h1></header>
         <main>
           <div id="ideal-form">
-            <p>On this page you can add an IBAN to your Yivi app.</p>
+            <p>This page will initiate an IDEAL payment of €0,01, with that Yivi will verify your IBAN.</p>
             <p>
-              Do you want to add multiple IBANs? Then perform these steps multiple times.
+              Do you want to add multiple IBANs? Then perform these steps multiple times.</p>
+            <p>
+              Yivi uses CM's IBAN Verification method, more information about this can be found here.
             </p>
-            <label htmlFor="ideal-bank-element">iDEAL Bank</label>
-            <IdealBankElement id="ideal-bank-element" />
 
             <label htmlFor="ideal-bank-element">Amount</label>
-            <p>€ 0,10</p>
+            <p>€ 0,01<span className='details'>*</span></p>
 
-            <StatusMessages messages={messages} />
+            <p className='details'>*10 cents is the minimum amount we can charge.</p>
+
           </div>
         </main>
         <footer>
           <div className="actions">
             <div></div>
-            <button id="submit-button" type="submit">Add IBAN</button>
+            <button id="submit-button" type="submit">Start IBAN verification</button>
           </div>
         </footer>
       </form>
-
     </>
   );
 };
 
-// Component for displaying results after returning from
-// iDEAL redirect flow.
-const IdealReturn = () => {
-  const stripe = useStripe();
-  const [messages, addMessage] = useMessages();
-
-  const query = new URLSearchParams(useLocation().search);
-  const clientSecret = query.get('payment_intent_client_secret');
-
-  useEffect(() => {
-    if (!stripe) {
-      return;
-    }
-    const fetchPaymentIntent = async () => {
-      const {
-        error,
-        paymentIntent,
-      } = await stripe.retrievePaymentIntent(clientSecret);
-      if (error) {
-        addMessage(error.message);
-      }
-      addMessage(`Payment ${paymentIntent.status}: ${paymentIntent.id}`);
-    };
-    fetchPaymentIntent();
-  }, [clientSecret, stripe, addMessage]);
-
-  return (
-    <>
-      <h1>Ideal Return</h1>
-      <StatusMessages messages={messages} />
-    </>
-  );
-};
-
-const Ideal = () => {
-  const query = new URLSearchParams(useLocation().search);
-  if (query.get('return')) {
-    return <IdealReturn />;
-  } else {
-    return <IdealForm />;
-  }
-};
-
-export default Ideal;
+export default IdealForm;

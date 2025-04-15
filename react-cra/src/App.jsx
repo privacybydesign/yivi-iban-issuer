@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 // Payment method components.
 import Ideal from './Ideal';
+import IssueCredential from './IssueCredential';
 
 import './App.css';
 
@@ -12,6 +13,7 @@ function App(props) {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Ideal />} />
+          <Route path="/return" element={<IssueCredential />} />
         </Routes>
       </BrowserRouter>
 

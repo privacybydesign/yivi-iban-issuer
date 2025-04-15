@@ -5,19 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
-	"github.com/stripe/stripe-go/v72"
-	"github.com/stripe/stripe-go/v72/paymentintent"
-	"github.com/stripe/stripe-go/v72/webhook"
 )
 
-var amount int64 = 0
+var cmUrl string = ""
+var merchantToken string = ""
+var returnUrl string = ""
+var transactionCache = make(map[string]string)
 
 func main() {
 	err := godotenv.Load()
@@ -25,164 +24,213 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
-	amount, err = strconv.ParseInt(os.Getenv("AMOUNT"), 10, 64)
-	log.Printf("iDeal amount is set to: %d cents", amount)
-	if err != nil {
-		log.Fatal("Error loading AMOUNT from .env file")
+	cmUrl = os.Getenv("CM_URL")
+	if cmUrl == "" {
+		log.Fatal("CM_URL is not set in .env file")
 		return
 	}
 
-	// For sample support and debugging, not required for production:
-	stripe.SetAppInfo(&stripe.AppInfo{
-		Name:    "stripe-samples/accept-a-payment/custom-payment-flow",
-		Version: "0.0.1",
-		URL:     "https://github.com/stripe-samples",
-	})
+	merchantToken = os.Getenv("MERCHANT_TOKEN")
+	if merchantToken == "" {
+		log.Fatal("MERCHANT_TOKEN is not set in .env file")
+		return
+	}
+
+	returnUrl = os.Getenv("RETURN_URL")
+	if returnUrl == "" {
+		log.Fatal("RETURN_URL is not set in .env file")
+		return
+	}
 
 	http.Handle("/", http.FileServer(http.Dir(os.Getenv("STATIC_DIR"))))
-	http.HandleFunc("/config", handleConfig)
-	http.HandleFunc("/create-payment-intent", handleCreatePaymentIntent)
-	http.HandleFunc("/success", handleSuccess)
-	http.HandleFunc("/payment/next", handlePaymentNext)
-	http.HandleFunc("/webhook", handleWebhook)
+	http.HandleFunc("/ibancheck", handleIBANCheck)
+	http.HandleFunc("/status", handleGetIBANStatus)
+	http.HandleFunc("/session", handleSession)
 
 	log.Println("server running at 0.0.0.0:4242")
 	http.ListenAndServe("0.0.0.0:4242", nil)
 }
 
-// ErrorResponseMessage represents the structure of the error
-// object sent in failed responses.
+type IbanCheck struct {
+	MerchantToken     string `json:"merchant_token"`
+	EntranceCode      string `json:"entrance_code"`
+	MerchantReturnUrl string `json:"merchant_return_url"`
+}
+
+type IdealTransaction struct {
+	TransactionID           string `json:"transaction_id"`
+	EntranceCode            string `json:"entrance_code"`
+	MerchantReference       string `json:"merchant_reference"`
+	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
+}
+
+type MerchantTransaction struct {
+	MerchantToken     string `json:"merchant_token"`
+	TransactionID     string `json:"transaction_id"`
+	MerchantReference string `json:"merchant_reference"`
+}
+
+type TransactionStatus struct {
+	TransactionID string `json:"transaction_id"`
+	Status        string `json:"status"`
+	IssuerID      string `json:"issuer_id"`
+	Name          string `json:"name"`
+	IBAN          string `json:"iban"`
+}
+
+type IBANCheckResponseMessage struct {
+	TransactionID           string `json:"transaction_id"`
+	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
+}
+
 type ErrorResponseMessage struct {
 	Message string `json:"message"`
 }
 
-// ErrorResponse represents the structure of the error object sent
-// in failed responses.
 type ErrorResponse struct {
 	Error *ErrorResponseMessage `json:"error"`
 }
 
-func handleConfig(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	writeJSON(w, struct {
-		PublishableKey string `json:"publishableKey"`
-	}{
-		PublishableKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-	})
-}
-
-type paymentIntentCreateReq struct {
-	Currency          string `json:"currency"`
-	PaymentMethodType string `json:"paymentMethodType"`
-}
-
-func handleCreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
-	req := paymentIntentCreateReq{}
-	json.NewDecoder(r.Body).Decode(&req)
-
-	var formattedPaymentMethodType []*string
-
-	if req.PaymentMethodType == "link" {
-		formattedPaymentMethodType = append(formattedPaymentMethodType, stripe.String("link"), stripe.String("card"))
-	} else {
-		formattedPaymentMethodType = append(formattedPaymentMethodType, stripe.String(req.PaymentMethodType))
-	}
-
-	params := &stripe.PaymentIntentParams{
-		Amount:             stripe.Int64(amount),
-		Currency:           stripe.String(req.Currency),
-		PaymentMethodTypes: formattedPaymentMethodType,
-	}
-
-	// If this is for an ACSS payment, we add payment_method_options to create
-	// the Mandate.
-	if req.PaymentMethodType == "acss_debit" {
-		params.PaymentMethodOptions = &stripe.PaymentIntentPaymentMethodOptionsParams{
-			ACSSDebit: &stripe.PaymentIntentPaymentMethodOptionsACSSDebitParams{
-				MandateOptions: &stripe.PaymentIntentPaymentMethodOptionsACSSDebitMandateOptionsParams{
-					PaymentSchedule: stripe.String("sporadic"),
-					TransactionType: stripe.String("personal"),
-				},
-			},
-		}
-	}
-
-	pi, err := paymentintent.New(params)
-	if err != nil {
-		// Try to safely cast a generic error to a stripe.Error so that we can get at
-		// some additional Stripe-specific information about what went wrong.
-		if stripeErr, ok := err.(*stripe.Error); ok {
-			fmt.Printf("Other Stripe error occurred: %v\n", stripeErr.Error())
-			writeJSONErrorMessage(w, stripeErr.Error(), 400)
-		} else {
-			fmt.Printf("Other error occurred: %v\n", err.Error())
-			writeJSONErrorMessage(w, "Unknown server error", 500)
-		}
-
-		return
-	}
-
-	writeJSON(w, struct {
-		ClientSecret string `json:"clientSecret"`
-	}{
-		ClientSecret: pi.ClientSecret,
-	})
-}
-
-func handleSuccess(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	http.Redirect(w, r, "/success.html", http.StatusSeeOther)
-	return
-}
-
-func handlePaymentNext(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-
-	payment_intent := r.URL.Query().Get("payment_intent")
-
-	pi, _ := paymentintent.Get(
-		payment_intent,
-		nil,
-	)
-
-	http.Redirect(w, r, fmt.Sprintf("/success?payment_intent_client_secret=%s", pi.ClientSecret), http.StatusSeeOther)
-	return
-}
-
-func handleWebhook(w http.ResponseWriter, r *http.Request) {
+func handleGetIBANStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	b, err := ioutil.ReadAll(r.Body)
+
+	// Define a struct to read the incoming JSON
+	var input struct {
+		TransactionID string `json:"transaction_id"`
+	}
+
+	// Decode the JSON body
+	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("ioutil.ReadAll: %v", err)
+		writeJSONErrorMessage(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	event, err := webhook.ConstructEvent(b, r.Header.Get("Stripe-Signature"), os.Getenv("STRIPE_WEBHOOK_SECRET"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf("webhook.ConstructEvent: %v", err)
+	fmt.Println("Getting status for transaction ID:", input.TransactionID)
+	merchantRef, found := transactionCache[input.TransactionID]
+	if !found {
+		writeJSONErrorMessage(w, "TransactionID not found", http.StatusNotFound)
 		return
 	}
 
-	if event.Type == "checkout.session.completed" {
-		fmt.Println("Checkout Session completed!")
+	merchantTransaction := MerchantTransaction{
+		MerchantToken:     merchantToken,
+		TransactionID:     input.TransactionID,
+		MerchantReference: merchantRef,
 	}
 
-	writeJSON(w, nil)
+	jsonData, err := json.Marshal(merchantTransaction)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return
+	}
+
+	// Do a request to CM backend.
+	fmt.Println("Calling CM with URL:", cmUrl+"transaction")
+	bytes, err := callCM("POST", cmUrl+"status", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error calling CM:", err)
+		writeJSONErrorMessage(w, "Error calling CM", http.StatusInternalServerError)
+		return
+	}
+
+	var transactionStatus TransactionStatus
+	err = json.Unmarshal(bytes, &transactionStatus)
+	if err != nil {
+		fmt.Println("Error unmarshaling response:", err)
+		return
+	}
+
+	fmt.Println("Response:", transactionStatus)
+	writeJSON(w, transactionStatus)
+}
+
+func handleIBANCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Generate new guid
+	guid := uuid.New().String()
+
+	// Create request body
+	ibanCheck := IbanCheck{
+		MerchantToken:     merchantToken,
+		EntranceCode:      guid,
+		MerchantReturnUrl: returnUrl,
+	}
+
+	fmt.Println(returnUrl)
+
+	jsonData, err := json.Marshal(ibanCheck)
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return
+	}
+
+	// Do a request to CM backend.
+	fmt.Println("Calling CM with URL:", cmUrl+"transaction")
+	bytes, err := callCM("POST", cmUrl+"transaction", bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("Error calling CM:", err)
+		writeJSONErrorMessage(w, "Error calling CM", http.StatusInternalServerError)
+		return
+	}
+
+	var ibanTransaction IdealTransaction
+	err = json.Unmarshal(bytes, &ibanTransaction)
+	if err != nil {
+		fmt.Println("Error unmarshaling response:", err)
+		return
+	}
+
+	// Add to transaction cache
+	fmt.Println("Adding to transaction cache:", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
+	transactionCache[ibanTransaction.TransactionID] = ibanTransaction.MerchantReference
+
+	responseMessage := IBANCheckResponseMessage{
+		TransactionID:           ibanTransaction.TransactionID,
+		IssuerAuthenticationURL: ibanTransaction.IssuerAuthenticationURL,
+	}
+	fmt.Println("Response:", responseMessage)
+	writeJSON(w, responseMessage)
+}
+
+func callCM(method string, url string, body io.Reader) ([]byte, error) {
+	// Create the request
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return nil, err
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create the HTTP client and execute the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error making request:", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading response:", err)
+		return nil, err
+	}
+
+	// Print status and response
+	fmt.Println("Status:", resp.Status)
+	fmt.Println("Response:", string(bytes))
+	return bytes, nil
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -202,7 +250,6 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 func writeJSONError(w http.ResponseWriter, v interface{}, code int) {
 	w.WriteHeader(code)
 	writeJSON(w, v)
-	return
 }
 
 func writeJSONErrorMessage(w http.ResponseWriter, message string, code int) {
