@@ -1,81 +1,81 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
-	"os"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 )
 
-var cmUrl string = ""
-var merchantToken string = ""
-var returnUrl string = ""
-var transactionCache = make(map[string]string)
+const ErrorPhoneNumberFormat = "error:phone-number-format"
+const ErrorRateLimit = "error:ratelimit"
+const ErrorCannotValidateToken = "error:cannot-validate-token"
+const ErrorAddressMalformed = "error:address-malformed"
+const ErrorInternal = "error:internal"
+const ErrorSendingSms = "error:sending-sms"
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	cmUrl = os.Getenv("CM_URL")
-	if cmUrl == "" {
-		log.Fatal("CM_URL is not set in .env file")
-		return
-	}
-
-	merchantToken = os.Getenv("MERCHANT_TOKEN")
-	if merchantToken == "" {
-		log.Fatal("MERCHANT_TOKEN is not set in .env file")
-		return
-	}
-
-	returnUrl = os.Getenv("RETURN_URL")
-	if returnUrl == "" {
-		log.Fatal("RETURN_URL is not set in .env file")
-		return
-	}
-
-	http.Handle("/", http.FileServer(http.Dir(os.Getenv("STATIC_DIR"))))
-	http.HandleFunc("/ibancheck", handleIBANCheck)
-	http.HandleFunc("/status", handleGetIBANStatus)
-	http.HandleFunc("/session", handleSession)
-
-	log.Println("server running at 0.0.0.0:4242")
-	http.ListenAndServe("0.0.0.0:4242", nil)
+type ServerConfig struct {
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	UseTls         bool   `json:"use_tls,omitempty"`
+	TlsPrivKeyPath string `json:"tls_priv_key_path,omitempty"`
+	TlsCertPath    string `json:"tls_cert_path,omitempty"`
 }
 
-type IbanCheck struct {
-	MerchantToken     string `json:"merchant_token"`
-	EntranceCode      string `json:"entrance_code"`
-	MerchantReturnUrl string `json:"merchant_return_url"`
+type ServerState struct {
+	ibanChecker      IbanChecker
+	jwtCreator       JwtCreator
+	transactionCache map[string]string
 }
 
-type IdealTransaction struct {
-	TransactionID           string `json:"transaction_id"`
-	EntranceCode            string `json:"entrance_code"`
-	MerchantReference       string `json:"merchant_reference"`
-	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
+type Server struct {
+	server *http.Server
+	config ServerConfig
 }
 
-type MerchantTransaction struct {
-	MerchantToken     string `json:"merchant_token"`
-	TransactionID     string `json:"transaction_id"`
-	MerchantReference string `json:"merchant_reference"`
+func (s *Server) ListenAndServe() error {
+	if s.config.UseTls {
+		return s.server.ListenAndServeTLS(s.config.TlsCertPath, s.config.TlsPrivKeyPath)
+	} else {
+		return s.server.ListenAndServe()
+	}
 }
 
-type TransactionStatus struct {
-	TransactionID string `json:"transaction_id"`
-	Status        string `json:"status"`
-	IssuerID      string `json:"issuer_id"`
-	Name          string `json:"name"`
-	IBAN          string `json:"iban"`
+func (s *Server) Stop() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return s.server.Shutdown(ctx)
+}
+
+func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
+	// static file server for the web part on the root
+	fs := http.FileServer(http.Dir("../react-cra/build"))
+
+	mux := http.NewServeMux()
+
+	mux.Handle("/", fs)
+
+	// api to handle validating the phone number
+	mux.HandleFunc("/ibancheck", func(w http.ResponseWriter, r *http.Request) {
+		handleIBANCheck(state, w, r)
+	})
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		handleGetIBANStatus(state, w, r)
+	})
+
+	addr := fmt.Sprintf("%v:%v", config.Host, config.Port)
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	return &Server{
+		server: server,
+		config: config,
+	}, nil
 }
 
 type IBANCheckResponseMessage struct {
@@ -83,15 +83,51 @@ type IBANCheckResponseMessage struct {
 	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
 }
 
-type ErrorResponseMessage struct {
-	Message string `json:"message"`
+func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	if r.Method != "POST" {
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Generate new guid
+	entranceCode := uuid.New().String()
+
+	ibanTransaction, err := state.ibanChecker.StartIbanCheck(entranceCode)
+	if err != nil {
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to start iban check", err)
+		return
+	}
+
+	// Add to transaction cache
+	fmt.Println("Adding to transaction cache:", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
+	state.transactionCache[ibanTransaction.TransactionID] = ibanTransaction.MerchantReference
+
+	responseMessage := IBANCheckResponseMessage{
+		TransactionID:           ibanTransaction.TransactionID,
+		IssuerAuthenticationURL: ibanTransaction.IssuerAuthenticationURL,
+	}
+
+	payload, err := json.Marshal(responseMessage)
+	if err != nil {
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to marshal response message", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(payload)
 }
 
-type ErrorResponse struct {
-	Error *ErrorResponseMessage `json:"error"`
+type IBANStatusResponseMessage struct {
+	TransactionStatus TransactionStatus `json:"transaction_status"`
+	Jwt               string            `json:"jwt"`
 }
 
-func handleGetIBANStatus(w http.ResponseWriter, r *http.Request) {
+func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	if r.Method != "POST" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
@@ -105,158 +141,58 @@ func handleGetIBANStatus(w http.ResponseWriter, r *http.Request) {
 	// Decode the JSON body
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		writeJSONErrorMessage(w, "Invalid JSON", http.StatusBadRequest)
+		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "failed to parse json for body of the request", err)
 		return
 	}
 
-	fmt.Println("Getting status for transaction ID:", input.TransactionID)
-	merchantRef, found := transactionCache[input.TransactionID]
+	merchantRef, found := state.transactionCache[input.TransactionID]
 	if !found {
-		writeJSONErrorMessage(w, "TransactionID not found", http.StatusNotFound)
+		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "transaction not found", err)
 		return
 	}
 
-	merchantTransaction := MerchantTransaction{
-		MerchantToken:     merchantToken,
-		TransactionID:     input.TransactionID,
-		MerchantReference: merchantRef,
-	}
-
-	jsonData, err := json.Marshal(merchantTransaction)
+	transactionStatus, err := state.ibanChecker.GetStatus(merchantRef, input.TransactionID)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to get iban status", err)
 		return
 	}
 
-	// Do a request to CM backend.
-	fmt.Println("Calling CM with URL:", cmUrl+"transaction")
-	bytes, err := callCM("POST", cmUrl+"status", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("Error calling CM:", err)
-		writeJSONErrorMessage(w, "Error calling CM", http.StatusInternalServerError)
+	if transactionStatus == nil {
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "transaction status is nil", err)
 		return
 	}
 
-	var transactionStatus TransactionStatus
-	err = json.Unmarshal(bytes, &transactionStatus)
+	IBANStatusResponseMessage := IBANStatusResponseMessage{
+		TransactionStatus: *transactionStatus,
+	}
+
+	if transactionStatus.Status == "success" {
+		// Create JWT
+		IBANStatusResponseMessage.Jwt, err = state.jwtCreator.CreateJwt(transactionStatus.Name, transactionStatus.IBAN, transactionStatus.IssuerID)
+		if err != nil {
+			respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to create jwt", err)
+			return
+		}
+		// Remove from transaction cache
+		delete(state.transactionCache, input.TransactionID)
+	}
+
+	payload, err := json.Marshal(IBANStatusResponseMessage)
 	if err != nil {
-		fmt.Println("Error unmarshaling response:", err)
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to marshal response message", err)
 		return
 	}
 
-	fmt.Println("Response:", transactionStatus)
-	writeJSON(w, transactionStatus)
-}
-
-func handleIBANCheck(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Generate new guid
-	guid := uuid.New().String()
-
-	// Create request body
-	ibanCheck := IbanCheck{
-		MerchantToken:     merchantToken,
-		EntranceCode:      guid,
-		MerchantReturnUrl: returnUrl,
-	}
-
-	fmt.Println(returnUrl)
-
-	jsonData, err := json.Marshal(ibanCheck)
-	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
-		return
-	}
-
-	// Do a request to CM backend.
-	fmt.Println("Calling CM with URL:", cmUrl+"transaction")
-	bytes, err := callCM("POST", cmUrl+"transaction", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("Error calling CM:", err)
-		writeJSONErrorMessage(w, "Error calling CM", http.StatusInternalServerError)
-		return
-	}
-
-	var ibanTransaction IdealTransaction
-	err = json.Unmarshal(bytes, &ibanTransaction)
-	if err != nil {
-		fmt.Println("Error unmarshaling response:", err)
-		return
-	}
-
-	// Add to transaction cache
-	fmt.Println("Adding to transaction cache:", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
-	transactionCache[ibanTransaction.TransactionID] = ibanTransaction.MerchantReference
-
-	responseMessage := IBANCheckResponseMessage{
-		TransactionID:           ibanTransaction.TransactionID,
-		IssuerAuthenticationURL: ibanTransaction.IssuerAuthenticationURL,
-	}
-	fmt.Println("Response:", responseMessage)
-	writeJSON(w, responseMessage)
-}
-
-func callCM(method string, url string, body io.Reader) ([]byte, error) {
-	// Create the request
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		fmt.Println("Error creating request:", err)
-		return nil, err
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-
-	// Create the HTTP client and execute the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println("Error making request:", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	bytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println("Error reading response:", err)
-		return nil, err
-	}
-
-	// Print status and response
-	fmt.Println("Status:", resp.Status)
-	fmt.Println("Response:", string(bytes))
-	return bytes, nil
-}
-
-func writeJSON(w http.ResponseWriter, v interface{}) {
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(v); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("json.NewEncoder.Encode: %v", err)
-		return
-	}
+	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	if _, err := io.Copy(w, &buf); err != nil {
-		log.Printf("io.Copy: %v", err)
-		return
-	}
+	w.Write(payload)
 }
 
-func writeJSONError(w http.ResponseWriter, v interface{}, code int) {
+func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg string, e error) {
+	m := fmt.Sprintf("%v: %v", logMsg, e)
+	fmt.Println("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
 	w.WriteHeader(code)
-	writeJSON(w, v)
-}
-
-func writeJSONErrorMessage(w http.ResponseWriter, message string, code int) {
-	resp := &ErrorResponse{
-		Error: &ErrorResponseMessage{
-			Message: message,
-		},
+	if _, err := w.Write([]byte(responseBody)); err != nil {
+		fmt.Println("failed to write body to http response: %v", err)
 	}
-	writeJSONError(w, resp, code)
 }

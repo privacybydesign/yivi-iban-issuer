@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+
 
 const IssueCredential = () => {
     const [transactionStatus, setTransactionStatus] = useState(null);
@@ -36,18 +38,15 @@ const IssueCredential = () => {
                 debugging: true,
                 element: '#yivi-web-form',
 
-                // Back-end options
+               // Back-end options
                 session: {
-                    // Point this to your controller:
-                    url: '/api',
+                    // Point this to your IRMA server:
+                    url: 'http://localhost:8088',
 
                     start: {
-                        url: (o) => `${o.url}/session`,
                         method: 'POST',
-                    },
-                    result: {
-                        url: (o, { sessionToken }) => `${o.url}/token/${sessionToken}`,
-                        method: 'GET',
+                        body: transactionStatus.jwt,
+                        headers: { 'Content-Type': 'text/plain' },
                     }
                 }
             });
@@ -72,13 +71,13 @@ const IssueCredential = () => {
                         <p>Scan the QR code below to add this information to Yivi..</p>
 
                         <label htmlFor="ideal-bank-element">Naam</label>
-                        <p>{transactionStatus?.name}</p>
+                        <p>{transactionStatus?.transaction_status?.name}</p>
 
                         <label htmlFor="ideal-bank-element">BIC</label>
-                        <p>{transactionStatus?.issuer_id}</p>
+                        <p>{transactionStatus?.transaction_status?.issuer_id}</p>
 
                         <label htmlFor="ideal-bank-element">IBAN</label>
-                        <p>{transactionStatus?.iban}</p>
+                        <p>{transactionStatus?.transaction_status?.iban}</p>
 
                         <div id="yivi-web-form">
                         </div>
@@ -86,9 +85,9 @@ const IssueCredential = () => {
                 </main>
                 <footer>
                     <div className="actions">
-                        <a id="back-button">
-                            Back
-                        </a>
+                    <Link to="/" id="back-button">
+                        Again
+                    </Link>
                         <div></div>
                     </div>
                 </footer>
