@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 const ErrorPhoneNumberFormat = "error:phone-number-format"
@@ -31,6 +34,11 @@ type ServerState struct {
 	transactionCache map[string]string
 }
 
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
 type Server struct {
 	server *http.Server
 	config ServerConfig
@@ -50,30 +58,61 @@ func (s *Server) Stop() error {
 	return s.server.Shutdown(ctx)
 }
 
+// ServeHTTP inspects the URL path to locate a file within the static dir
+// on the SPA handler. If a file is found, it will be served. If not, the
+// file located at the index path on the SPA handler will be served. This
+// is suitable behavior for serving an SPA (single page application).
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Join internally call path.Clean to prevent directory traversal
+	path := filepath.Join(h.staticPath, r.URL.Path)
+	fmt.Println("Serving file:", path)
+	// check whether a file exists or is a directory at the given path
+	fi, err := os.Stat(path)
+	if os.IsNotExist(err) || fi.IsDir() {
+		// file does not exist or path is a directory, serve index.html
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
+		return
+	}
+
+	if err != nil {
+		// if we got an error (that wasn't that the file doesn't exist) stating the
+		// file, return a 500 internal server error and stop
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// otherwise, use http.FileServer to serve the static file
+	http.FileServer(http.Dir(h.staticPath)).ServeHTTP(w, r)
+}
+
 func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
-	// static file server for the web part on the root
-	fs := http.FileServer(http.Dir("../react-cra/build"))
+	router := mux.NewRouter()
 
-	mux := http.NewServeMux()
+	router.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	})
 
-	mux.Handle("/", fs)
-
-	// api to handle validating the phone number
-	mux.HandleFunc("/ibancheck", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/api/ibancheck", func(w http.ResponseWriter, r *http.Request) {
 		handleIBANCheck(state, w, r)
 	})
-	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
 		handleGetIBANStatus(state, w, r)
 	})
 
+	spa := spaHandler{staticPath: "../react-cra/build", indexPath: "index.html"}
+	router.PathPrefix("/").Handler(spa)
+
 	addr := fmt.Sprintf("%v:%v", config.Host, config.Port)
-	server := &http.Server{
+	srv := &http.Server{
+		Handler: router,
 		Addr:    addr,
-		Handler: mux,
+		// Good practice: enforce timeouts for servers you create!
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
 	}
 
 	return &Server{
-		server: server,
+		server: srv,
 		config: config,
 	}, nil
 }
@@ -137,6 +176,9 @@ type IBANStatusResponseMessage struct {
 	Jwt               string            `json:"jwt"`
 }
 
+// handles a POST request to get the status of an IBAN check
+// Expects a JSON body with a "transaction_id" field
+// Returns a JSON response with the transaction status and JWT if successful
 func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
