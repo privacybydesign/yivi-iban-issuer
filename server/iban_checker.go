@@ -40,7 +40,7 @@ type TransactionStatus struct {
 
 type IbanChecker interface {
 	GetStatus(merchantRef string, transactionId string) (*TransactionStatus, error)
-	StartIbanCheck(entranceCode string) (*IdealTransaction, error)
+	StartIbanCheck(entranceCode string, language string) (*IdealTransaction, error)
 }
 
 type CmIbanConfig struct {
@@ -91,11 +91,14 @@ func (s *CmIbanChecker) GetStatus(merchantRef string, transactionId string) (*Tr
 	return &transactionStatus, nil
 }
 
-func (s *CmIbanChecker) StartIbanCheck(entranceCode string) (*IdealTransaction, error) {
+func (s *CmIbanChecker) StartIbanCheck(entranceCode string, language string) (*IdealTransaction, error) {
+	returnUrl := fmt.Sprintf(s.ReturnUrl, language)
+	fmt.Println("Composed returnUrl: ", returnUrl)
+
 	ibanCheck := IbanCheck{
 		MerchantToken:     s.MerchantToken,
 		EntranceCode:      entranceCode,
-		MerchantReturnUrl: s.ReturnUrl,
+		MerchantReturnUrl: returnUrl,
 	}
 
 	jsonData, err := json.Marshal(ibanCheck)

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const IdealForm = () => {
+  const { t, i18n } = useTranslation();
 
   const handleSubmit = async (e) => {
     // We don't want to let default form submission happen here,
@@ -14,7 +16,10 @@ const IdealForm = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          language: i18n.language
+        }),
       }
     );
     const data = await response.json()
@@ -24,27 +29,24 @@ const IdealForm = () => {
   return (
     <>
       <form id="container" onSubmit={handleSubmit}>
-        <header><h1>Adding an IBAN</h1></header>
+        <header><h1>{t('add_iban')}</h1></header>
         <main>
           <div id="ideal-form">
-            <p>This page will initiate an IDEAL payment of €0,01, with that Yivi will verify your IBAN.</p>
-            <p>
-              Do you want to add multiple IBANs? Then perform these steps multiple times.</p>
-            <p>
-              Yivi uses CM's IBAN Verification method, more information about this can be found here.
-            </p>
+            <p>{t('initiate')}</p>
+            <p>{t('multiple')}</p>
+            <p>{t('cm')}</p>
 
-            <label htmlFor="ideal-bank-element">Amount</label>
+            <label htmlFor="ideal-bank-element"><p>{t('amount')}</p></label>
             <p>€ 0,01<span className='details'>*</span></p>
 
-            <p className='details'>*10 cents is the minimum amount we can charge.</p>
+            <p className='details'>*{t('minimum')}</p>
 
           </div>
         </main>
         <footer>
           <div className="actions">
             <div></div>
-            <button id="submit-button" type="submit">Start IBAN verification</button>
+            <button id="submit-button" type="submit">{t('start')}</button>
           </div>
         </footer>
       </form>

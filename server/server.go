@@ -94,7 +94,19 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	// Generate new guid
 	entranceCode := uuid.New().String()
 
-	ibanTransaction, err := state.ibanChecker.StartIbanCheck(entranceCode)
+	// Define a struct to read the incoming JSON
+	var input struct {
+		Language string `json:"language"`
+	}
+
+	// Decode the JSON body
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "failed to parse json for body of the request", err)
+		return
+	}
+
+	ibanTransaction, err := state.ibanChecker.StartIbanCheck(entranceCode, input.Language)
 	if err != nil {
 		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to start iban check", err)
 		return

@@ -221,3 +221,13 @@ footer button {
 	font-size: small;
 	font-style: italic;
 }
+
+.imageContainer {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.imageContainer img {
+	max-width: 300px;
+}

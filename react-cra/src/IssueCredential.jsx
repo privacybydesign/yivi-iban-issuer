@@ -1,93 +1,136 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-
+import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const IssueCredential = () => {
-    const [transactionStatus, setTransactionStatus] = useState(null);
+    const navigate = useNavigate();
+    const [statusResponse, setStatusResponse] = useState(null);
+    const [error, setError] = useState(false);
+    const [done, setDone] = useState(false);
+
+    const { t, i18n } = useTranslation();
 
     useEffect(() => {
         const fetchTransactionStatus = async () => {
             const params = new URLSearchParams(window.location.search);
             const transactionId = params.get('trxid');
 
-            if (!transactionId) {
-                alert('Something went wrong')
+            if (transactionId) {
+                // Call backend API to start iDEAL flow.
+                const response = await fetch(
+                    '/api/status',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            transaction_id: transactionId,
+                        })
+                    }
+                );
+                const data = await response.json();
+                setStatusResponse(data);
             }
-            // Call backend API to start iDEAL flow.
-            const response = await fetch(
-                '/api/status',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        transaction_id: transactionId,
-                    })
-                }
-            );
-            const data = await response.json();
-            setTransactionStatus(data);
         };
-        fetchTransactionStatus();
+        fetchTransactionStatus().catch((error) => {
+            console.error('Error fetching transaction status:', error);
+            setError(true);
+        });
     }, []);
 
     useEffect(() => {
-        import("@privacybydesign/yivi-frontend").then((yivi) => {
-            const web = yivi.newWeb({
-                debugging: true,
-                element: '#yivi-web-form',
+        if (statusResponse) {
+            if (statusResponse.transaction_status?.status !== 'success') {
+                setError(true);
+                return;
+            }
 
-               // Back-end options
-                session: {
-                    // Point this to your IRMA server:
-                    url: 'http://localhost:8088',
+            import("@privacybydesign/yivi-frontend").then((yivi) => {
+                const web = yivi.newWeb({
+                    debugging: true,
+                    language: i18n.language,
+                    element: '#yivi-web-form',
 
-                    start: {
-                        method: 'POST',
-                        body: transactionStatus.jwt,
-                        headers: { 'Content-Type': 'text/plain' },
+                    // Back-end options
+                    session: {
+                        // Point this to your IRMA server:
+                        url: 'https://is.staging.yivi.app',
+
+                        start: {
+                            method: 'POST',
+                            body: statusResponse.jwt,
+                            headers: { 'Content-Type': 'text/plain' },
+                        }
                     }
-                }
-            });
-            web.start()
-                .then((result) => {
-                    setAccessToken(result.access);
-                    router.push('/organizations');
-                })
-                .catch((err) => {
-                    alert(err);
                 });
-        });
-    }, [transactionStatus]);
+                web.start()
+                    .then((result) => {
+                        setDone(true);
+                    })
+                    .catch((err) => {
+                        console.error('Error starting Yivi:', err);
+                        setError(true);
+                    });
+            });
+        }
+
+    }, [statusResponse]);
+
+    const showError = () => {
+        switch (statusResponse?.transaction_status?.status) {
+            case 'failure':
+                return <p>{t('failure')}</p>;
+            case 'cancelled':
+                return <p>{t('cancelled')}</p>;
+            default:
+                return <p>{t('error')}</p>;
+        }
+    }
 
     return (
         <>
             <div id="container">
-                <header><h1>Adding an IBAN</h1></header>
+                <header><h1>{t('add_iban')}</h1></header>
                 <main>
                     <div id="ideal-form">
-                        <p>The following information was returned from the iDEAL payment.</p>
-                        <p>Scan the QR code below to add this information to Yivi..</p>
+                        {error && (
+                                <div className="imageContainer">
+                                    <img src="/images/fail.png" alt="error" />
+                                    {showError()}
+                                </div>
+                        )}
+                        {!error && !done && (
+                            <>
+                                <p>{t('information')}</p>
+                                <p>{t('qr')}</p>
 
-                        <label htmlFor="ideal-bank-element">Naam</label>
-                        <p>{transactionStatus?.transaction_status?.name}</p>
+                                <label htmlFor="ideal-bank-element">{t('name')}</label>
+                                <p>{statusResponse?.transaction_status?.name}</p>
 
-                        <label htmlFor="ideal-bank-element">BIC</label>
-                        <p>{transactionStatus?.transaction_status?.issuer_id}</p>
+                                <label htmlFor="ideal-bank-element">BIC</label>
+                                <p>{statusResponse?.transaction_status?.issuer_id}</p>
 
-                        <label htmlFor="ideal-bank-element">IBAN</label>
-                        <p>{transactionStatus?.transaction_status?.iban}</p>
+                                <label htmlFor="ideal-bank-element">IBAN</label>
+                                <p>{statusResponse?.transaction_status?.iban}</p>
 
-                        <div id="yivi-web-form">
-                        </div>
+                                <div id="yivi-web-form">
+                                </div>
+                            </>
+                        )}
+                        {done && (
+                                <div className="imageContainer">
+                                    <img src="/images/done.png" alt="error" />
+                                    <p>{t('thank_you')}</p>
+                                </div>
+                        )}
                     </div>
                 </main>
                 <footer>
                     <div className="actions">
-                    <Link to="/" id="back-button">
-                        Again
-                    </Link>
+                        <Link to="/" id="back-button">
+                            {t('again')}
+                        </Link>
                         <div></div>
                     </div>
                 </footer>
