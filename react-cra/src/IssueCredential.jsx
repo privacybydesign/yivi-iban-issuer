@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 const IssueCredential = () => {
-    const navigate = useNavigate();
     const [statusResponse, setStatusResponse] = useState(null);
     const [error, setError] = useState(false);
     const [done, setDone] = useState(false);
