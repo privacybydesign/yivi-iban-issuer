@@ -60,8 +60,6 @@ npm start
 
 The frontend will be available at `http://localhost:3000`.
 
----
-
 ## Docker Deployment
 
 To deploy the application using Docker, run:
@@ -80,13 +78,9 @@ The backend configuration is stored in `local-secrets/local.json`. Key fields in
 - `jwt_private_key_path`: Path to the private key for JWT signing.
 - `cm_iban_config`: Configuration for CM's IBAN verification API.
 
----
-
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).
-
----
 
 ## Contributing
 
