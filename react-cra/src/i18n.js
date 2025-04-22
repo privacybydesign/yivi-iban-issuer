@@ -24,7 +24,7 @@ i18n
                     cancelled: "You cancelled the iDEAL transaction, please try again.",
                     error: "Something went wrong. Please try again.",
                     name: "Name",
-                    again: "Opniew",
+                    again: "Again",
 
                     information: "The following information was returned from the iDEAL payment.",
                     qr: "Scan the QR code below to add this information to Yivi.",
@@ -47,7 +47,7 @@ i18n
                     cancelled: "U heeft de iDEAL-transactie geannuleerd. Probeer het opnieuw.",
                     error: "Er is iets misgegaan. Probeer het opnieuw.",
                     name: "Naam",
-                    again: "Again",
+                    again: "Opnieuw",
 
                     information: "De volgende informatie werd geretourneerd vanuit de iDEAL-betaling.",
                     qr: "Scan de QR-code hieronder om deze informatie aan Yivi toe te voegen.",
