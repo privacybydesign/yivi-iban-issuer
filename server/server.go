@@ -30,9 +30,9 @@ type ServerConfig struct {
 }
 
 type ServerState struct {
-	ibanChecker      IbanChecker
-	jwtCreator       JwtCreator
-	transactionCache map[string]string
+	ibanChecker  IbanChecker
+	jwtCreator   JwtCreator
+	tokenStorage TokenStorage
 }
 
 type spaHandler struct {
@@ -120,8 +120,8 @@ func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
 }
 
 type IBANCheckResponseMessage struct {
-	TransactionID           string `json:"transaction_id"`
-	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
+	TransactionID           TransactonId `json:"transaction_id"`
+	IssuerAuthenticationURL string       `json:"issuer_authentication_url"`
 }
 
 func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request) {
@@ -155,8 +155,11 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 
 	// Add to transaction cache
 	fmt.Println("Adding to transaction cache:", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
-	state.transactionCache[ibanTransaction.TransactionID] = ibanTransaction.MerchantReference
-
+	err = state.tokenStorage.StoreToken(ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
+	if err != nil {
+		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to store token in cache", err)
+		return
+	}
 	responseMessage := IBANCheckResponseMessage{
 		TransactionID:           ibanTransaction.TransactionID,
 		IssuerAuthenticationURL: ibanTransaction.IssuerAuthenticationURL,
@@ -191,7 +194,7 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 
 	// Define a struct to read the incoming JSON
 	var input struct {
-		TransactionID string `json:"transaction_id"`
+		TransactionID TransactonId `json:"transaction_id"`
 	}
 
 	// Decode the JSON body
@@ -201,8 +204,8 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	merchantRef, found := state.transactionCache[input.TransactionID]
-	if !found {
+	merchantRef, err := state.tokenStorage.RetrieveToken(input.TransactionID)
+	if err != nil {
 		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "transaction not found", err)
 		return
 	}
@@ -230,7 +233,11 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 			return
 		}
 		// Remove from transaction cache
-		delete(state.transactionCache, input.TransactionID)
+		err = state.tokenStorage.RemoveToken(input.TransactionID)
+		if err != nil {
+			respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to delete token from cache", err)
+			return
+		}
 	}
 
 	payload, err := json.Marshal(IBANStatusResponseMessage)

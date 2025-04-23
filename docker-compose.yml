@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: go-sms-issuer
+    container_name: iban-issuer
     ports:
       - "8080:8080"
     expose:
