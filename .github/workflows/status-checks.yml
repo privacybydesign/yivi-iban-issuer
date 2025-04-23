@@ -21,9 +21,11 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
+        working-directory: react-cra
         run: npm install
 
       - name: Build project
+        working-directory: react-cra
         run: npm run build
 
     analyze-go:
