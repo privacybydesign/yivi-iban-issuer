@@ -64,7 +64,7 @@ const IssueCredential = () => {
                     }
                 });
                 web.start()
-                    .then((result) => {
+                    .then(() => {
                         setDone(true);
                     })
                     .catch((err) => {

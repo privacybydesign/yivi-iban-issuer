@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	log "yivi-iban-issuer/logging"
 )
 
 type Config struct {
@@ -14,8 +15,10 @@ type Config struct {
 	IssuerId          string `json:"issuer_id"`
 	FullCredential    string `json:"full_credential"`
 
-	CmIbanConfig CmIbanConfig `json:"cm_iban_config,omitempty"`
-	StorageType  string       `json:"storage_type"`
+	CmIbanConfig        CmIbanConfig        `json:"cm_iban_config,omitempty"`
+	StorageType         string              `json:"storage_type"`
+	RedisConfig         RedisConfig         `json:"redis_config,omitempty"`
+	RedisSentinelConfig RedisSentinelConfig `json:"redis_sentinel_config,omitempty"`
 }
 
 func main() {
@@ -23,17 +26,17 @@ func main() {
 	flag.Parse()
 
 	if *configPath == "" {
-		fmt.Println("please provide a config path using the --config flag")
+		log.Error.Fatalf("please provide a config path using the --config flag")
 	}
 
-	fmt.Println("using config: %v", *configPath)
+	log.Info.Printf("using config: %v", *configPath)
 
 	config, err := readConfigFile(*configPath)
 	if err != nil {
-		fmt.Println("failed to read config file: %v", err)
+		log.Error.Fatalf("failed to read config file: %v", err)
 	}
 
-	fmt.Println("hosting on: %v:%v", config.ServerConfig.Host, config.ServerConfig.Port)
+	log.Info.Printf("hosting on: %v:%v", config.ServerConfig.Host, config.ServerConfig.Port)
 
 	jwtCreator, err := NewIrmaJwtCreator(
 		config.JwtPrivateKeyPath,
@@ -41,29 +44,58 @@ func main() {
 		config.FullCredential,
 	)
 	if err != nil {
-		fmt.Println("failed to instantiate jwt creator: %v", err)
+		log.Error.Fatalf("failed to instantiate jwt creator: %v", err)
 	}
 
 	ibanChecker, err := createIbanBackend(&config)
 	if err != nil {
-		fmt.Println("failed to instantiate sms backend: %v", err)
+		log.Error.Fatalf("failed to instantiate sms backend: %v", err)
+	}
+
+	tokenStorage, err := createTokenStorage(&config)
+	if err != nil {
+		log.Error.Fatalf("failed to instantiate token storage: %v", err)
 	}
 
 	serverState := ServerState{
-		ibanChecker:      ibanChecker,
-		jwtCreator:       jwtCreator,
-		transactionCache: make(map[string]string),
+		ibanChecker:  ibanChecker,
+		jwtCreator:   jwtCreator,
+		tokenStorage: tokenStorage,
 	}
 
 	server, err := NewServer(&serverState, config.ServerConfig)
 	if err != nil {
-		fmt.Println("failed to create server: %v", err)
+		log.Error.Fatalf("failed to create server: %v", err)
 	}
 
 	err = server.ListenAndServe()
 	if err != nil {
-		fmt.Println("failed to listen and serve: %v", err)
+		log.Error.Fatalf("failed to listen and serve: %v", err)
 	}
+}
+
+func createTokenStorage(config *Config) (TokenStorage, error) {
+	if config.StorageType == "redis" {
+		log.Info.Printf("Using redis token storage")
+		client, err := NewRedisClient(&config.RedisConfig)
+		if err != nil {
+			return nil, err
+		}
+		return NewRedisTokenStorage(client), nil
+	}
+	if config.StorageType == "redis_sentinel" {
+		log.Info.Printf("Using redis sentinal storage")
+		client, err := NewRedisSentinelClient(&config.RedisSentinelConfig)
+		if err != nil {
+			return nil, err
+		}
+		return NewRedisTokenStorage(client), nil
+	}
+	if config.StorageType == "memory" {
+		log.Info.Printf("Using in memory storage")
+		return NewInMemoryTokenStorage(), nil
+	}
+	return nil, fmt.Errorf("%v is not a valid storage type", config.StorageType)
 }
 
 func createIbanBackend(config *Config) (IbanChecker, error) {

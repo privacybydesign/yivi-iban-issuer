@@ -11,43 +11,47 @@ import (
 	"time"
 )
 
+type TransactonId string
+type MerchantReference string
+type MerchantToken string
+
 type IbanCheck struct {
-	MerchantToken     string `json:"merchant_token"`
-	EntranceCode      string `json:"entrance_code"`
-	MerchantReturnUrl string `json:"merchant_return_url"`
+	MerchantToken     MerchantToken `json:"merchant_token"`
+	EntranceCode      string        `json:"entrance_code"`
+	MerchantReturnUrl string        `json:"merchant_return_url"`
 }
 
 type IdealTransaction struct {
-	TransactionID           string `json:"transaction_id"`
-	EntranceCode            string `json:"entrance_code"`
-	MerchantReference       string `json:"merchant_reference"`
-	IssuerAuthenticationURL string `json:"issuer_authentication_url"`
+	TransactionID           TransactonId      `json:"transaction_id"`
+	EntranceCode            string            `json:"entrance_code"`
+	MerchantReference       MerchantReference `json:"merchant_reference"`
+	IssuerAuthenticationURL string            `json:"issuer_authentication_url"`
 }
 
 type MerchantTransaction struct {
-	MerchantToken     string `json:"merchant_token"`
-	TransactionID     string `json:"transaction_id"`
-	MerchantReference string `json:"merchant_reference"`
+	MerchantToken     MerchantToken     `json:"merchant_token"`
+	TransactionID     TransactonId      `json:"transaction_id"`
+	MerchantReference MerchantReference `json:"merchant_reference"`
 }
 
 type TransactionStatus struct {
-	TransactionID string `json:"transaction_id"`
-	Status        string `json:"status"`
-	IssuerID      string `json:"issuer_id"`
-	Name          string `json:"name"`
-	IBAN          string `json:"iban"`
+	TransactionID TransactonId `json:"transaction_id"`
+	Status        string       `json:"status"`
+	IssuerID      string       `json:"issuer_id"`
+	Name          string       `json:"name"`
+	IBAN          string       `json:"iban"`
 }
 
 type IbanChecker interface {
-	GetStatus(merchantRef string, transactionId string) (*TransactionStatus, error)
+	GetStatus(merchantRef MerchantReference, transactionId TransactonId) (*TransactionStatus, error)
 	StartIbanCheck(entranceCode string, language string) (*IdealTransaction, error)
 }
 
 type CmIbanConfig struct {
-	BaseUrl       string `json:"base_url"`
-	TimeoutMs     int64  `json:"timeout_ms"`
-	ReturnUrl     string `json:"return_url"`
-	MerchantToken string `json:"merchant_token"`
+	BaseUrl       string        `json:"base_url"`
+	TimeoutMs     int64         `json:"timeout_ms"`
+	ReturnUrl     string        `json:"return_url"`
+	MerchantToken MerchantToken `json:"merchant_token"`
 }
 
 type CmIbanChecker struct {
@@ -62,7 +66,7 @@ func NewCmIbanChecker(config CmIbanConfig) (*CmIbanChecker, error) {
 	return &CmIbanChecker{config}, nil
 }
 
-func (s *CmIbanChecker) GetStatus(merchantRef string, transactionId string) (*TransactionStatus, error) {
+func (s *CmIbanChecker) GetStatus(merchantRef MerchantReference, transactionId TransactonId) (*TransactionStatus, error) {
 	merchantTransaction := MerchantTransaction{
 		MerchantToken:     s.MerchantToken,
 		TransactionID:     transactionId,

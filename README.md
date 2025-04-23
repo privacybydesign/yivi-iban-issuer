@@ -72,11 +72,38 @@ This will start the backend, frontend, and required services (e.g., Redis, IRMA 
 
 ## Configuration
 
-The backend configuration is stored in `local-secrets/local.json`. Key fields include:
-
-- `server_config`: Host and port for the backend server.
-- `jwt_private_key_path`: Path to the private key for JWT signing.
-- `cm_iban_config`: Configuration for CM's IBAN verification API.
+The backend configuration is stored in `local-secrets/local.json`. A sample for a local docker compose setup:
+```
+{
+    "server_config": {
+        "host": "0.0.0.0",
+        "port": 8080,
+        "static_path": "../frontend/build"
+    },
+    "jwt_private_key_path": "/secrets/priv.pem",
+    "issuer_id": "iban_issuer",
+    "full_credential": "pbdf-staging.pbdf.iban",
+    "cm_iban_config": {
+        "base_url": "https://api.cm.com/ibancheck/v1.0/",
+        "timeout_ms": 5000,
+        "merchant_token": "<redacted>",
+        "return_url": "http://localhost:8080/%s/return"
+    },
+    "storage_type": "redis",
+    "redis_config": {
+        "host": "redis",
+        "port": 6379,
+        "password": "password"
+    },
+    "redis_sentinel_config": {
+        "sentinel_host": "redis-sentinel",
+        "sentinel_port": 26379,
+        "sentinel_username": "sentinel_user",
+        "password": "password123",
+        "master_name": "mymaster"
+    }
+}
+```
 
 ## License
 
