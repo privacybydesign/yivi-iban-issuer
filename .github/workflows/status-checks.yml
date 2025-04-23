@@ -1,0 +1,75 @@
+# Workflow to check whether changes to master fulfill all requirements.
+name: Status checks
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  # Make it possible to trigger the checks manually.
+  workflow_dispatch:
+
+jobs:
+    build-frontend:
+      strategy:
+        matrix:
+          lang: [ en, nl ]
+      runs-on: ubuntu-latest
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
+        - name: Use Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: '18'
+
+        - name: Install dependencies
+          run: npm install
+
+        - name: Build project
+          run: npm run build
+
+    analyze-go:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-go@v5
+        - name: Check fmt
+          working-directory: server
+          run:  test -z $(gofmt -l .)
+
+        - name: Install GolangCI-Lint
+          run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.63.4
+
+        - name: Run linter
+          working-directory: server
+          run: golangci-lint run
+
+    test-go:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Docker meta
+          id: meta
+          uses: docker/metadata-action@v5
+          with:
+            images: ghcr.io/${{ github.repository }}
+            tags: |
+              type=semver,pattern={{major}}.{{minor}}.{{patch}}
+              type=raw,value=edge
+
+        - name: Login to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Build Docker image for testing
+          run: docker build -t iban-issuer-tests --file Dockerfile.test .
+
+        - name: Run tests
+          run: docker run iban-issuer-tests
+ 
