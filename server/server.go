@@ -91,7 +91,10 @@ func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		err := json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		if err != nil {
+			log.Error.Fatalf("failed to write body to http response: %v", err)
+		}
 	})
 
 	router.HandleFunc("/api/ibancheck", func(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +177,10 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(payload)
+	_, err = w.Write(payload)
+	if err != nil {
+		log.Error.Fatalf("failed to write body to http response: %v", err)
+	}
 }
 
 type IBANStatusResponseMessage struct {
@@ -249,7 +255,10 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(payload)
+	_, err = w.Write(payload)
+	if err != nil {
+		log.Error.Fatalf("failed to write body to http response: %v", err)
+	}
 }
 
 func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg string, e error) {

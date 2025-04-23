@@ -39,7 +39,6 @@ type DefaultJwtCreator struct {
 	privateKey *rsa.PrivateKey
 	issuerId   string
 	credential string
-	attribute  string
 }
 
 func (jc *DefaultJwtCreator) CreateJwt(fullname string, iban string, bic string) (string, error) {
