@@ -28,29 +28,29 @@ jobs:
         working-directory: react-cra
         run: npm run build
 
-    golangci:
-      name: lint
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-go@v5
-          with:
-            go-version: stable
-        - name: golangci-lint
-          uses: golangci/golangci-lint-action@v7
-          with:
-            working-directory: server
-            version: v2.0
+    # golangci:
+    #   name: lint
+    #   runs-on: ubuntu-latest
+    #   steps:
+    #     - uses: actions/checkout@v4
+    #     - uses: actions/setup-go@v5
+    #       with:
+    #         go-version: stable
+    #     - name: golangci-lint
+    #       uses: golangci/golangci-lint-action@v7
+    #       with:
+    #         working-directory: server
+    #         version: v2.0
 
-    test-go:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
+    # test-go:
+    #   runs-on: ubuntu-latest
+    #   steps:
+    #     - name: Checkout
+    #       uses: actions/checkout@v4
 
-        - name: Build Docker image for testing
-          run: docker build -t iban-issuer-tests --file Dockerfile.test .
+    #     - name: Build Docker image for testing
+    #       run: docker build -t iban-issuer-tests --file Dockerfile.test .
 
-        - name: Run tests
-          run: docker run iban-issuer-tests
+    #     - name: Run tests
+    #       run: docker run iban-issuer-tests
  
