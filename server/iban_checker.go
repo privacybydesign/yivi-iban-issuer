@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	log "yivi-iban-issuer/logging"
 )
 
 type TransactonId string
@@ -73,22 +74,24 @@ func (s *CmIbanChecker) GetStatus(merchantRef MerchantReference, transactionId T
 		MerchantReference: merchantRef,
 	}
 
+	log.Info.Printf("Checking status for transaction: %v", transactionId)
+
 	jsonData, err := json.Marshal(merchantTransaction)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		log.Error.Fatalf("Error marshaling JSON:", err)
 		return nil, err
 	}
 
 	bytes, err := CallCM(s, "POST", s.BaseUrl+"status", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("Error calling CM:", err)
+		log.Error.Fatalf("Error calling CM:", err)
 		return nil, err
 	}
 
 	var transactionStatus TransactionStatus
 	err = json.Unmarshal(bytes, &transactionStatus)
 	if err != nil {
-		fmt.Println("Error unmarshaling response:", err)
+		log.Error.Fatalf("Error unmarshaling response:", err)
 		return nil, err
 	}
 
@@ -97,7 +100,7 @@ func (s *CmIbanChecker) GetStatus(merchantRef MerchantReference, transactionId T
 
 func (s *CmIbanChecker) StartIbanCheck(entranceCode string, language string) (*IdealTransaction, error) {
 	returnUrl := fmt.Sprintf(s.ReturnUrl, language)
-	fmt.Println("Composed returnUrl: ", returnUrl)
+	log.Info.Printf("Starting IBAN check, composed returnUrl is: %v", returnUrl)
 
 	ibanCheck := IbanCheck{
 		MerchantToken:     s.MerchantToken,
@@ -107,22 +110,22 @@ func (s *CmIbanChecker) StartIbanCheck(entranceCode string, language string) (*I
 
 	jsonData, err := json.Marshal(ibanCheck)
 	if err != nil {
-		fmt.Println("Error marshaling JSON:", err)
+		log.Info.Printf("Error marshaling JSON:", err)
 		return nil, err
 	}
 
 	// Do a request to CM backend.
-	fmt.Println("Calling CM with URL:", s.BaseUrl+"transaction")
+	log.Info.Printf("Calling CM with URL: ", s.BaseUrl+"transaction")
 	bytes, err := CallCM(s, "POST", s.BaseUrl+"transaction", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("Error calling CM:", err)
+		log.Error.Fatalf("Error calling CM:", err)
 		return nil, err
 	}
 
 	var ibanTransaction IdealTransaction
 	err = json.Unmarshal(bytes, &ibanTransaction)
 	if err != nil {
-		fmt.Println("Error unmarshaling response:", err)
+		log.Error.Fatalf("Error unmarshaling response:", err)
 		return nil, err
 	}
 
@@ -133,7 +136,7 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	// Create the request
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		fmt.Println("Error creating request:", err)
+		log.Error.Fatalf("Error creating request:", err)
 		return nil, err
 	}
 
@@ -144,7 +147,7 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	client := &http.Client{Timeout: time.Duration(s.TimeoutMs) * time.Millisecond}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error making request:", err)
+		log.Error.Fatalf("Error making request:", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -152,12 +155,11 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	// Read the response body
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response:", err)
+		log.Error.Fatalf("Error reading response:", err)
 		return nil, err
 	}
 
 	// Print status and response
-	fmt.Println("Status:", resp.Status)
-	fmt.Println("Response:", string(bytes))
+	log.Info.Printf("CM Responsed with status code %v", resp.Status)
 	return bytes, nil
 }

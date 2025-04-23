@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	log "yivi-iban-issuer/logging"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -67,7 +68,6 @@ func (s *Server) Stop() error {
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Join internally call path.Clean to prevent directory traversal
 	path := filepath.Join(h.staticPath, r.URL.Path)
-	fmt.Println("Serving file:", path)
 	// check whether a file exists or is a directory at the given path
 	fi, err := os.Stat(path)
 	if os.IsNotExist(err) || fi.IsDir() {
@@ -147,6 +147,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	log.Info.Printf("Received IBAN check request with entrance code: %v", entranceCode)
 	ibanTransaction, err := state.ibanChecker.StartIbanCheck(entranceCode, input.Language)
 	if err != nil {
 		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to start iban check", err)
@@ -154,7 +155,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	}
 
 	// Add to transaction cache
-	fmt.Println("Adding to transaction cache:", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
+	log.Info.Printf("Adding to transaction cache: %v %v", ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
 	err = state.tokenStorage.StoreToken(ibanTransaction.TransactionID, ibanTransaction.MerchantReference)
 	if err != nil {
 		respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to store token in cache", err)
@@ -253,9 +254,9 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 
 func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg string, e error) {
 	m := fmt.Sprintf("%v: %v", logMsg, e)
-	fmt.Println("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
+	log.Error.Fatalf("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(responseBody)); err != nil {
-		fmt.Println("failed to write body to http response: %v", err)
+		log.Error.Fatalf("failed to write body to http response: %v", err)
 	}
 }
