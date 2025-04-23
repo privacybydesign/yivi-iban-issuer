@@ -23,6 +23,7 @@ const ErrorSendingSms = "error:sending-sms"
 type ServerConfig struct {
 	Host           string `json:"host"`
 	Port           int    `json:"port"`
+	StaticPath     string `json:"static_path"`
 	UseTls         bool   `json:"use_tls,omitempty"`
 	TlsPrivKeyPath string `json:"tls_priv_key_path,omitempty"`
 	TlsCertPath    string `json:"tls_cert_path,omitempty"`
@@ -62,6 +63,7 @@ func (s *Server) Stop() error {
 // on the SPA handler. If a file is found, it will be served. If not, the
 // file located at the index path on the SPA handler will be served. This
 // is suitable behavior for serving an SPA (single page application).
+// https://github.com/gorilla/mux?tab=readme-ov-file#serving-single-page-applications
 func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Join internally call path.Clean to prevent directory traversal
 	path := filepath.Join(h.staticPath, r.URL.Path)
@@ -99,7 +101,7 @@ func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
 		handleGetIBANStatus(state, w, r)
 	})
 
-	spa := spaHandler{staticPath: "../react-cra/build", indexPath: "index.html"}
+	spa := spaHandler{staticPath: config.StaticPath, indexPath: "index.html"}
 	router.PathPrefix("/").Handler(spa)
 
 	addr := fmt.Sprintf("%v:%v", config.Host, config.Port)
