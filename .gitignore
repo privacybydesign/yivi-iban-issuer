@@ -3,7 +3,6 @@
 .vscode
 .secrets
 local-secrets
-server
 
 # Node files
 node_modules/
