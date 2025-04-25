@@ -4,6 +4,7 @@
 .secrets
 local-secrets
 
+.vite
 # Node files
 node_modules/
 
