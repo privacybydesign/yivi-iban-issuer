@@ -81,7 +81,7 @@ func createTokenStorage(config *Config) (TokenStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewRedisTokenStorage(client), nil
+		return NewRedisTokenStorage(client, "iban-issuer"), nil
 	}
 	if config.StorageType == "redis_sentinel" {
 		log.Info.Printf("Using redis sentinal storage")
@@ -89,7 +89,7 @@ func createTokenStorage(config *Config) (TokenStorage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return NewRedisTokenStorage(client), nil
+		return NewRedisTokenStorage(client, config.RedisSentinelConfig.SentinelUsername), nil
 	}
 	if config.StorageType == "memory" {
 		log.Info.Printf("Using in memory storage")

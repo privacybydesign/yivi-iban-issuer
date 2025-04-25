@@ -21,11 +21,12 @@ func NewInMemoryTokenStorage() *InMemoryTokenStorage {
 }
 
 type RedisTokenStorage struct {
-	client *redis.Client
+	client   *redis.Client
+	username string
 }
 
-func NewRedisTokenStorage(client *redis.Client) *RedisTokenStorage {
-	return &RedisTokenStorage{client: client}
+func NewRedisTokenStorage(client *redis.Client, username string) *RedisTokenStorage {
+	return &RedisTokenStorage{client: client, username: username}
 }
 
 // Should be safe to use in concurreny
@@ -37,20 +38,20 @@ type TokenStorage interface {
 
 // ------------------------------------------------------------------------------
 
-func createKey(transactionId TransactonId) string {
-	return fmt.Sprintf("iban-issuer:token:%v", transactionId)
+func createKey(username string, transactionId TransactonId) string {
+	return fmt.Sprintf("%v:token:%v", username, transactionId)
 }
 
 const Timeout time.Duration = 24 * time.Hour
 
 func (s *RedisTokenStorage) StoreToken(transactionId TransactonId, merchantReference MerchantReference) error {
 	ctx := context.Background()
-	return s.client.Set(ctx, createKey(transactionId), string(merchantReference), Timeout).Err()
+	return s.client.Set(ctx, createKey(s.username, transactionId), string(merchantReference), Timeout).Err()
 }
 
 func (s *RedisTokenStorage) RetrieveToken(transactionId TransactonId) (MerchantReference, error) {
 	ctx := context.Background()
-	result, err := s.client.Get(ctx, createKey(transactionId)).Result()
+	result, err := s.client.Get(ctx, createKey(s.username, transactionId)).Result()
 	fmt.Println("result", result)
 	if err != nil {
 		return "", err
@@ -61,7 +62,7 @@ func (s *RedisTokenStorage) RetrieveToken(transactionId TransactonId) (MerchantR
 
 func (s *RedisTokenStorage) RemoveToken(transactionId TransactonId) error {
 	ctx := context.Background()
-	return s.client.Del(ctx, createKey(transactionId)).Err()
+	return s.client.Del(ctx, createKey(s.username, transactionId)).Err()
 }
 
 // ------------------------------------------------------------------------------
