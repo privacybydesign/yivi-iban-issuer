@@ -12,6 +12,7 @@ type Config struct {
 	ServerConfig ServerConfig `json:"server_config"`
 
 	JwtPrivateKeyPath string `json:"jwt_private_key_path"`
+	IrmaServerUrl     string `json:"irma_server_url"`
 	IssuerId          string `json:"issuer_id"`
 	FullCredential    string `json:"full_credential"`
 
@@ -58,9 +59,10 @@ func main() {
 	}
 
 	serverState := ServerState{
-		ibanChecker:  ibanChecker,
-		jwtCreator:   jwtCreator,
-		tokenStorage: tokenStorage,
+		irmaServerURL: config.IrmaServerUrl,
+		ibanChecker:   ibanChecker,
+		jwtCreator:    jwtCreator,
+		tokenStorage:  tokenStorage,
 	}
 
 	server, err := NewServer(&serverState, config.ServerConfig)
