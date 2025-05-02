@@ -81,6 +81,7 @@ The backend configuration is stored in `local-secrets/local.json`. A sample for 
         "static_path": "../frontend/build"
     },
     "jwt_private_key_path": "/secrets/priv.pem",
+    "irma_server_url": "https://is.staging.yivi.app",
     "issuer_id": "iban_issuer",
     "full_credential": "pbdf-staging.pbdf.iban",
     "cm_iban_config": {

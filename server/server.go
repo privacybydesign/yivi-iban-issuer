@@ -31,9 +31,10 @@ type ServerConfig struct {
 }
 
 type ServerState struct {
-	ibanChecker  IbanChecker
-	jwtCreator   JwtCreator
-	tokenStorage TokenStorage
+	irmaServerURL string
+	ibanChecker   IbanChecker
+	jwtCreator    JwtCreator
+	tokenStorage  TokenStorage
 }
 
 type spaHandler struct {
@@ -186,6 +187,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 type IBANStatusResponseMessage struct {
 	TransactionStatus TransactionStatus `json:"transaction_status"`
 	Jwt               string            `json:"jwt"`
+	IrmaServerURL     string            `json:"irma_server_url"`
 }
 
 // handles a POST request to get the status of an IBAN check
@@ -235,6 +237,7 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 	if transactionStatus.Status == "success" {
 		// Create JWT
 		IBANStatusResponseMessage.Jwt, err = state.jwtCreator.CreateJwt(transactionStatus.Name, transactionStatus.IBAN, transactionStatus.IssuerID)
+		IBANStatusResponseMessage.IrmaServerURL = state.irmaServerURL
 		if err != nil {
 			respondWithErr(w, http.StatusInternalServerError, ErrorInternal, "failed to create jwt", err)
 			return

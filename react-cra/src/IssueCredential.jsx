@@ -53,8 +53,7 @@ const IssueCredential = () => {
 
                     // Back-end options
                     session: {
-                        // Point this to your IRMA server:
-                        url: 'https://is.staging.yivi.app',
+                        url: statusResponse.irma_server_url,
 
                         start: {
                             method: 'POST',
