@@ -34,7 +34,6 @@ const IdealForm = () => {
           <div id="ideal-form">
             <p>{t('initiate')}</p>
             <p>{t('multiple')}</p>
-            <p>{t('cm')}</p>
 
             <label htmlFor="ideal-bank-element"><p>{t('amount')}</p></label>
             <p>€ 0,01<span className='details'>*</span></p>
