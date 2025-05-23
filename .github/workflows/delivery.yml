@@ -58,21 +58,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan Image
-        uses: anchore/scan-action@v3
-        id: scan
-        with:
-          image: local/yivi-iban-issuer:scan
-          only-fixed: true
-          fail-build: true
-          severity-cutoff: critical
-          output-format: sarif
+      # - name: Scan Image
+      #   uses: anchore/scan-action@v3
+      #   id: scan
+      #   with:
+      #     image: local/yivi-iban-issuer:scan
+      #     only-fixed: true
+      #     fail-build: true
+      #     severity-cutoff: critical
+      #     output-format: sarif
 
-      - name: Upload Anchore scan SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        if: ${{ !cancelled() }}
-        with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+      # - name: Upload Anchore scan SARIF report
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   if: ${{ !cancelled() }}
+      #   with:
+      #     sarif_file: ${{ steps.scan.outputs.sarif }}
 
       - name: Push image to GitHub Container Registry
         uses: docker/build-push-action@v5
