@@ -50,6 +50,7 @@ func (jc *DefaultJwtCreator) CreateJwt(fullname string, iban string, bic string)
 				"iban":     iban,
 				"bic":      bic,
 			},
+			SdJwtBatchSize: irma.DefaultSdJwtIssueAmount,
 		},
 	})
 
