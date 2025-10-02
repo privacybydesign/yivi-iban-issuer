@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "dependencies": {
-    "@privacybydesign/yivi-frontend": "^0.2.0",
+    "@privacybydesign/yivi-frontend": "^0.2.1",
     "i18next": "^25.0.1",
     "i18next-browser-languagedetector": "^8.0.5",
     "react": "^17.0.2",
