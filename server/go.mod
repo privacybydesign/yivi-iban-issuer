@@ -72,7 +72,7 @@ require (
 	github.com/privacybydesign/gabi v0.0.0-20221212095008-68a086907750 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sietseringers/go-sse v0.0.0-20200801161811-e2cf2c63ca50 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/templexxx/cpu v0.0.9 // indirect
 	github.com/templexxx/xorsimd v0.4.1 // indirect
