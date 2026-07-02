@@ -52,7 +52,6 @@ func (s *RedisTokenStorage) StoreToken(transactionId TransactonId, merchantRefer
 func (s *RedisTokenStorage) RetrieveToken(transactionId TransactonId) (MerchantReference, error) {
 	ctx := context.Background()
 	result, err := s.client.Get(ctx, createKey(s.username, transactionId)).Result()
-	fmt.Println("result", result)
 	if err != nil {
 		return "", err
 	}
