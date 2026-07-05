@@ -23,7 +23,8 @@ const ErrorSendingSms = "error:sending-sms"
 
 // allowedLanguages is the set of language codes accepted from client requests.
 // The value is interpolated into the CM iDEAL return URL, so it must be
-// restricted to a fixed allowlist to prevent open-redirect manipulation.
+// restricted to a fixed allowlist so a client-supplied value cannot influence
+// the return URL.
 var allowedLanguages = map[string]bool{"nl": true, "en": true, "de": true}
 
 // isAllowedLanguage reports whether lang is a permitted language code.
@@ -163,7 +164,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 
 	// The language value is interpolated into the CM iDEAL MerchantReturnUrl
 	// (see CmIbanChecker.StartIbanCheck). Restrict it to a known allowlist so a
-	// user-supplied value cannot control part of the return URL (open redirect).
+	// user-supplied value cannot control part of the return URL.
 	if !isAllowedLanguage(input.Language) {
 		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "invalid language value", fmt.Errorf("unknown language: %q", input.Language))
 		return
