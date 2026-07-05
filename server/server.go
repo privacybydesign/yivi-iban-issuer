@@ -165,8 +165,18 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	// The language value is interpolated into the CM iDEAL MerchantReturnUrl
 	// (see CmIbanChecker.StartIbanCheck). Restrict it to a known allowlist so a
 	// user-supplied value cannot control part of the return URL.
+	//
+	// This 400 is written inline rather than via respondWithErr because the
+	// latter currently calls log.Error.Fatalf (os.Exit) on every error path,
+	// which would turn an unknown-language request into a full-server DoS. That
+	// Fatalf-vs-Printf hardening is tracked separately in #34; once it lands,
+	// this can be folded back into respondWithErr.
 	if !isAllowedLanguage(input.Language) {
-		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "invalid language value", fmt.Errorf("unknown language: %q", input.Language))
+		log.Error.Printf("rejecting IBAN check request with unknown language: %q", input.Language)
+		w.WriteHeader(http.StatusBadRequest)
+		if _, err := w.Write([]byte(ErrorInternal)); err != nil {
+			log.Error.Printf("failed to write body to http response: %v", err)
+		}
 		return
 	}
 
