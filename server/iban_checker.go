@@ -78,20 +78,20 @@ func (s *CmIbanChecker) GetStatus(merchantRef MerchantReference, transactionId T
 
 	jsonData, err := json.Marshal(merchantTransaction)
 	if err != nil {
-		log.Error.Fatal("Error marshaling JSON:", err)
+		log.Error.Printf("Error marshaling JSON: %v", err)
 		return nil, err
 	}
 
 	bytes, err := CallCM(s, "POST", s.BaseUrl+"status", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Error.Fatal("Error calling CM:", err)
+		log.Error.Printf("Error calling CM: %v", err)
 		return nil, err
 	}
 
 	var transactionStatus TransactionStatus
 	err = json.Unmarshal(bytes, &transactionStatus)
 	if err != nil {
-		log.Error.Fatal("Error unmarshaling response:", err)
+		log.Error.Printf("Error unmarshaling response: %v", err)
 		return nil, err
 	}
 
@@ -110,7 +110,7 @@ func (s *CmIbanChecker) StartIbanCheck(entranceCode string, language string) (*I
 
 	jsonData, err := json.Marshal(ibanCheck)
 	if err != nil {
-		log.Error.Fatal("Error marshaling JSON:", err)
+		log.Error.Printf("Error marshaling JSON: %v", err)
 		return nil, err
 	}
 
@@ -118,14 +118,14 @@ func (s *CmIbanChecker) StartIbanCheck(entranceCode string, language string) (*I
 	log.Info.Printf("Calling CM with URL: %v", s.BaseUrl+"transaction")
 	bytes, err := CallCM(s, "POST", s.BaseUrl+"transaction", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Error.Fatal("Error calling CM:", err)
+		log.Error.Printf("Error calling CM: %v", err)
 		return nil, err
 	}
 
 	var ibanTransaction IdealTransaction
 	err = json.Unmarshal(bytes, &ibanTransaction)
 	if err != nil {
-		log.Error.Fatal("Error unmarshaling response:", err)
+		log.Error.Printf("Error unmarshaling response: %v", err)
 		return nil, err
 	}
 
@@ -136,7 +136,7 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	// Create the request
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		log.Error.Fatal("Error creating request:", err)
+		log.Error.Printf("Error creating request: %v", err)
 		return nil, err
 	}
 
@@ -147,7 +147,7 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	client := &http.Client{Timeout: time.Duration(s.TimeoutMs) * time.Millisecond}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error.Fatal("Error making request:", err)
+		log.Error.Printf("Error making request: %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -155,7 +155,7 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 	// Read the response body
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error.Fatal("Error reading response:", err)
+		log.Error.Printf("Error reading response: %v", err)
 		return nil, err
 	}
 

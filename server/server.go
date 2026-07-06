@@ -94,7 +94,7 @@ func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
 	router.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		err := json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		if err != nil {
-			log.Error.Fatalf("failed to write body to http response: %v", err)
+			log.Error.Printf("failed to write body to http response: %v", err)
 		}
 	})
 
@@ -180,7 +180,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(payload)
 	if err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
 
@@ -260,15 +260,15 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(payload)
 	if err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
 
 func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg string, e error) {
 	m := fmt.Sprintf("%v: %v", logMsg, e)
-	log.Error.Fatalf("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
+	log.Error.Printf("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(responseBody)); err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
