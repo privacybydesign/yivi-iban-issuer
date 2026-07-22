@@ -24,8 +24,9 @@ const ErrorSendingSms = "error:sending-sms"
 // allowedLanguages is the set of language codes accepted from client requests.
 // The value is interpolated into the CM iDEAL return URL, so it must be
 // restricted to a fixed allowlist so a client-supplied value cannot influence
-// the return URL.
-var allowedLanguages = map[string]bool{"nl": true, "en": true, "de": true}
+// the return URL. Keep this in sync with the languages the frontend supports
+// (react-cra/src/i18n.js).
+var allowedLanguages = map[string]bool{"nl": true, "en": true}
 
 // isAllowedLanguage reports whether lang is a permitted language code.
 func isAllowedLanguage(lang string) bool {
