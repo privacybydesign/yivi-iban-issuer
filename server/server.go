@@ -82,16 +82,25 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(h.staticPath, r.URL.Path)
 	// check whether a file exists or is a directory at the given path
 	fi, err := os.Stat(path)
-	if os.IsNotExist(err) || fi.IsDir() {
-		// file does not exist or path is a directory, serve index.html
+	if os.IsNotExist(err) {
+		// file does not exist, serve index.html
 		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
 		return
 	}
 
 	if err != nil {
 		// if we got an error (that wasn't that the file doesn't exist) stating the
-		// file, return a 500 internal server error and stop
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// file, log the real error internally and return a generic 500 so we don't
+		// expose internal error details to the client. Handle this before
+		// dereferencing fi, which is nil whenever os.Stat errors.
+		log.Error.Printf("failed to stat static file %q: %v", path, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	if fi.IsDir() {
+		// path is a directory, serve index.html
+		http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
 		return
 	}
 
@@ -105,7 +114,7 @@ func NewServer(state *ServerState, config ServerConfig) (*Server, error) {
 	router.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		err := json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 		if err != nil {
-			log.Error.Fatalf("failed to write body to http response: %v", err)
+			log.Error.Printf("failed to write body to http response: %v", err)
 		}
 	})
 
@@ -165,18 +174,8 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	// The language value is interpolated into the CM iDEAL MerchantReturnUrl
 	// (see CmIbanChecker.StartIbanCheck). Restrict it to a known allowlist so a
 	// user-supplied value cannot control part of the return URL.
-	//
-	// This 400 is written inline rather than via respondWithErr because the
-	// latter currently calls log.Error.Fatalf (os.Exit) on every error path,
-	// which would turn an unknown-language request into a full-server DoS. That
-	// Fatalf-vs-Printf hardening is tracked separately in #34; once it lands,
-	// this can be folded back into respondWithErr.
 	if !isAllowedLanguage(input.Language) {
-		log.Error.Printf("rejecting IBAN check request with unknown language: %q", input.Language)
-		w.WriteHeader(http.StatusBadRequest)
-		if _, err := w.Write([]byte(ErrorInternal)); err != nil {
-			log.Error.Printf("failed to write body to http response: %v", err)
-		}
+		respondWithErr(w, http.StatusBadRequest, ErrorInternal, "rejecting IBAN check request with unknown language", fmt.Errorf("language %q not allowed", input.Language))
 		return
 	}
 
@@ -209,7 +208,7 @@ func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(payload)
 	if err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
 
@@ -289,15 +288,15 @@ func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	_, err = w.Write(payload)
 	if err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
 
 func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg string, e error) {
 	m := fmt.Sprintf("%v: %v", logMsg, e)
-	log.Error.Fatalf("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
+	log.Error.Printf("%s\n -> returning statuscode %d with message %v", m, code, responseBody)
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(responseBody)); err != nil {
-		log.Error.Fatalf("failed to write body to http response: %v", err)
+		log.Error.Printf("failed to write body to http response: %v", err)
 	}
 }
