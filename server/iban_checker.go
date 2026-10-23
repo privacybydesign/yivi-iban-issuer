@@ -150,7 +150,11 @@ func CallCM(s *CmIbanChecker, method string, url string, body io.Reader) ([]byte
 		log.Error.Printf("Error making request: %v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	// Read the response body
 	bytes, err := io.ReadAll(resp.Body)

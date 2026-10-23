@@ -16,10 +16,10 @@ type Config struct {
 	IssuerId          string `json:"issuer_id"`
 	FullCredential    string `json:"full_credential"`
 
-	CmIbanConfig        CmIbanConfig        `json:"cm_iban_config,omitempty"`
+	CmIbanConfig        CmIbanConfig        `json:"cm_iban_config"`
 	StorageType         string              `json:"storage_type"`
-	RedisConfig         RedisConfig         `json:"redis_config,omitempty"`
-	RedisSentinelConfig RedisSentinelConfig `json:"redis_sentinel_config,omitempty"`
+	RedisConfig         RedisConfig         `json:"redis_config"`
+	RedisSentinelConfig RedisSentinelConfig `json:"redis_sentinel_config"`
 }
 
 func main() {

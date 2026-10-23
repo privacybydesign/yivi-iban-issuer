@@ -150,7 +150,7 @@ type IBANCheckResponseMessage struct {
 }
 
 func handleIBANCheck(state *ServerState, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer closeRequestBody(r)
 
 	if r.Method != "POST" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -223,7 +223,7 @@ type IBANStatusResponseMessage struct {
 // Expects a JSON body with a "transaction_id" field
 // Returns a JSON response with the transaction status and JWT if successful
 func handleGetIBANStatus(state *ServerState, w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer closeRequestBody(r)
 
 	if r.Method != "POST" {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -299,5 +299,11 @@ func respondWithErr(w http.ResponseWriter, code int, responseBody string, logMsg
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(responseBody)); err != nil {
 		log.Error.Printf("failed to write body to http response: %v", err)
+	}
+}
+
+func closeRequestBody(r *http.Request) {
+	if err := r.Body.Close(); err != nil {
+		log.Error.Printf("failed to close request body: %v", err)
 	}
 }
