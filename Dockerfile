@@ -19,7 +19,8 @@ RUN CGO_ENABLED=0 go build -o server
 FROM alpine:latest
 
 COPY --from=backend-build /app/backend/server /app/backend/server
-COPY --from=frontend-build /app/frontend /app/frontend
+# Only the build output; static_path in the config is ../frontend/build.
+COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
 WORKDIR /app/backend
 EXPOSE 8080
