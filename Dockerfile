@@ -1,4 +1,4 @@
-FROM node:23-slim AS frontend-build
+FROM node:25-slim AS frontend-build
 WORKDIR /app/frontend
 COPY react-cra .
 RUN npm install
@@ -6,7 +6,7 @@ RUN npm run build
 
 # -----------------------------------------------------
 
-FROM golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82 AS backend-build
+FROM golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8 AS backend-build
 WORKDIR /app/backend
 COPY server .
 RUN go mod download
