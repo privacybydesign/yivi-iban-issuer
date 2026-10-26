@@ -15,6 +15,7 @@ type JwtCreator interface {
 func NewIrmaJwtCreator(privateKeyPath string,
 	issuerId string,
 	crediential string,
+	sdJwtBatchSize uint,
 ) (*DefaultJwtCreator, error) {
 	keyBytes, err := os.ReadFile(privateKeyPath)
 
@@ -29,16 +30,18 @@ func NewIrmaJwtCreator(privateKeyPath string,
 	}
 
 	return &DefaultJwtCreator{
-		issuerId:   issuerId,
-		privateKey: privateKey,
-		credential: crediential,
+		issuerId:       issuerId,
+		privateKey:     privateKey,
+		credential:     crediential,
+		sdJwtBatchSize: sdJwtBatchSize,
 	}, nil
 }
 
 type DefaultJwtCreator struct {
-	privateKey *rsa.PrivateKey
-	issuerId   string
-	credential string
+	privateKey     *rsa.PrivateKey
+	issuerId       string
+	credential     string
+	sdJwtBatchSize uint
 }
 
 func (jc *DefaultJwtCreator) CreateJwt(fullname string, iban string, bic string) (string, error) {
@@ -50,7 +53,7 @@ func (jc *DefaultJwtCreator) CreateJwt(fullname string, iban string, bic string)
 				"iban":     iban,
 				"bic":      bic,
 			},
-			SdJwtBatchSize: irma.DefaultSdJwtIssueAmount,
+			SdJwtBatchSize: jc.sdJwtBatchSize,
 		},
 	})
 

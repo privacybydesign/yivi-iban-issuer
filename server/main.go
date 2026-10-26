@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	log "yivi-iban-issuer/logging"
+
+	irma "github.com/privacybydesign/irmago"
 )
 
 type Config struct {
 	ServerConfig ServerConfig `json:"server_config"`
 
 	JwtPrivateKeyPath string `json:"jwt_private_key_path"`
+	SdJwtBatchSize    *uint  `json:"sd_jwt_batch_size"`
 	IrmaServerUrl     string `json:"irma_server_url"`
 	IssuerId          string `json:"issuer_id"`
 	FullCredential    string `json:"full_credential"`
@@ -39,10 +42,16 @@ func main() {
 
 	log.Info.Printf("hosting on: %v:%v", config.ServerConfig.Host, config.ServerConfig.Port)
 
+	sdJwtBatchSize := irma.DefaultSdJwtIssueAmount
+	if config.SdJwtBatchSize != nil {
+		sdJwtBatchSize = *config.SdJwtBatchSize
+	}
+
 	jwtCreator, err := NewIrmaJwtCreator(
 		config.JwtPrivateKeyPath,
 		config.IssuerId,
 		config.FullCredential,
+		sdJwtBatchSize,
 	)
 	if err != nil {
 		log.Error.Fatalf("failed to instantiate jwt creator: %v", err)
