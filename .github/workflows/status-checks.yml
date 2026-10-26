@@ -1,56 +1,73 @@
-# Workflow to check whether changes to master fulfill all requirements.
+# Status checks, using the shared workflows from privacybydesign/github-workflows.
+# The gate job "Status checks passed" is the one check to require.
 name: Status checks
 
 on:
   push:
-    branches: [ master ]
+    branches: [main]
   pull_request:
-  # Make it possible to trigger the checks manually.
+  merge_group:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
-    build-frontend:
-      runs-on: ubuntu-latest
-      steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+  frontend:
+    uses: privacybydesign/github-workflows/.github/workflows/node-checks.yml@v1
+    permissions:
+      contents: read
+    with:
+      working-directory: react-cra
+      scripts: build
+      ignore-scripts: true
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
+  go:
+    uses: privacybydesign/github-workflows/.github/workflows/go-checks.yml@v1
+    permissions:
+      contents: read
+    with:
+      working-directory: server
+      # The tests need no services (Redis etc.), so they run natively with the
+      # Go version from go.mod instead of via Dockerfile.test.
 
-      - name: Install dependencies
-        working-directory: react-cra
-        run: npm install
+  # Builds and scans the image without pushing it; Delivery pushes from main.
+  docker:
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    uses: privacybydesign/github-workflows/.github/workflows/docker-publish.yml@v1
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+    with:
+      push-image: false
 
-      - name: Build project
-        working-directory: react-cra
-        run: npm run build
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    uses: privacybydesign/github-workflows/.github/workflows/dependency-review.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
 
-    # golangci:
-    #   name: lint
-    #   runs-on: ubuntu-latest
-    #   steps:
-    #     - uses: actions/checkout@v4
-    #     - uses: actions/setup-go@v5
-    #       with:
-    #         go-version: stable
-    #     - name: golangci-lint
-    #       uses: golangci/golangci-lint-action@v7
-    #       with:
-    #         working-directory: server
-    #         version: v2.0
+  workflow-lint:
+    uses: privacybydesign/github-workflows/.github/workflows/workflow-lint.yml@v1
+    permissions:
+      contents: read
 
-    # test-go:
-    #   runs-on: ubuntu-latest
-    #   steps:
-    #     - name: Checkout
-    #       uses: actions/checkout@v4
-
-    #     - name: Build Docker image for testing
-    #       run: docker build -t iban-issuer-tests --file Dockerfile.test .
-
-    #     - name: Run tests
-    #       run: docker run iban-issuer-tests
- 
+  passed:
+    name: Status checks passed
+    if: always()
+    needs: [frontend, go, docker, dependency-review, workflow-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: All required jobs succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if grep -qE '"(failure|cancelled)"' <<< "$RESULTS"; then exit 1; fi
