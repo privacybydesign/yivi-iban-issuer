@@ -16,12 +16,14 @@ RUN CGO_ENABLED=0 go build -o server
 
 # -----------------------------------------------------
 
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
 COPY --from=backend-build /app/backend/server /app/backend/server
-# Only the build output; static_path in the config is ../frontend/build.
-COPY --from=frontend-build /app/frontend/build /app/frontend/build
+COPY --from=frontend-build /app/frontend/build/ /app/frontend/build
 
-WORKDIR /app/backend
+# Declared explicitly to satisfy static scanners; the :nonroot tag already
+# defaults to this same user (UID 65532).
+USER nonroot:nonroot
+
 EXPOSE 8080
-CMD ["./server", "--config", "/secrets/local.json"]
+ENTRYPOINT [ "/app/backend/server", "--config", "/secrets/local.json" ]
