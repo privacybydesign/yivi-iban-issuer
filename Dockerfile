@@ -1,4 +1,4 @@
-FROM node:23-slim AS frontend-build
+FROM node:24-slim AS frontend-build
 WORKDIR /app/frontend
 COPY react-cra .
 RUN npm install
@@ -6,7 +6,7 @@ RUN npm run build
 
 # -----------------------------------------------------
 
-FROM golang:1.26.10@sha256:672c944cfd07599b5f1bb179869270cdc94c6254e41db4d431259693cb286b82 AS backend-build
+FROM golang:1.26.11@sha256:7af425da11f4fc1a9308eb704369e3f6d1c44e35bac0f874a59ade3f20fdc07e AS backend-build
 WORKDIR /app/backend
 COPY server .
 RUN go mod download
@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 go build -o server
 
 # -----------------------------------------------------
 
-FROM alpine:latest
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 COPY --from=backend-build /app/backend/server /app/backend/server
 # Only the build output; static_path in the config is ../frontend/build.
